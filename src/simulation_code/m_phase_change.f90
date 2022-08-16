@@ -753,8 +753,8 @@ MODULE m_phase_change
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! CHECKING IF PTG RELAXATION IS NEEDED  =====================
                         rhoe = 0.d0
-                        !Bsum = 0.d0
-                        !rcv  = 0.d0
+                        Bsum = 0.d0
+                        rcv  = 0.d0
                         relax = .FALSE.
                         IF (mpp_lim) THEN
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
@@ -767,27 +767,27 @@ MODULE m_phase_change
                         IF (relax) THEN
                            DO i = 1, num_fluids
                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
-                               Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i) 
+                               Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)*fluid_pp(i)%gamma 
                                rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
                                !PRINT *, 'alpha :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
                            END DO                   
                            pres_relax = (rhoe - pi_inf)/gamma
-                           Tmix = (pres_relax+Bsum)*gamma/rcv
+                           Tmix = (pres_relax*gamma+Bsum)/rcv
                            !PRINT *, 'rhoe :: ',rhoe,', Bsum :: ',Bsum,', rcv :: ',rcv
                            !PRINT *, 'Tmix :: ',Tmix,', pres :: ',pres_relax
                            IF(pres_relax .LT. pres_crit .AND. Tmix .LT. T_crit) THEN
                              Tsat = f_Tsat(pres_relax)
-                             DO i = 1, 1
-                               Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                    -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                                    -fluid_pp(i)%pi_inf & 
-                                    /(1.d0+fluid_pp(i)%gamma)) &
-                                    /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
-                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
-                             END DO
-                             IF (Tk(1) .LT. Tsat) relax = .FALSE.
-                             IF (Tk(1) .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
+                             !DO i = 1, 1
+                             !  Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                             !       -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                             !       /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
+                             !       -fluid_pp(i)%pi_inf & 
+                             !       /(1.d0+fluid_pp(i)%gamma)) &
+                             !       /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
+                             !       /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
+                             !END DO
+                             IF (Tmix .LT. Tsat) relax = .FALSE.
+                             IF (Tmix .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
                              !PRINT *,'Tk(1) :: ',Tk(1),', Tk(2) ::',Tk(2)
                            ELSE
                              relax = .FALSE.
