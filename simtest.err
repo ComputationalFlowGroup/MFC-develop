@@ -1,6 +1,0 @@
-module: unloading 'mpi/openmpi_4.1.1_gcc_10.2_slurm20'
-module: loading 'mpi/openmpi_4.1.1_gcc_10.2_slurm20'
-module: mpi: To use: module load gcc/10.2 cuda/11.1.1 (for cuda support)
-module: unloading 'gcc/10.2'
-module: loading 'gcc/10.2'
-module: gcc: "Note: loading the gcc module overrides the gcc version on the system.  If you want to revert to the version of gcc provided by the OS, unload the gcc module."
