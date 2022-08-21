@@ -27,7 +27,8 @@
 #>   intended to be modified by users.
 #>
 #SBATCH --job-name="{name}"
-#>SBATCH --ntasks-per-node={cpus_per_node}
+#SBATCH --nodes {nodes}
+#SBATCH --ntasks-per-node={cpus_per_node}
 #SBATCH --cpus-per-task=1
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
@@ -37,14 +38,14 @@
 #SBATCH --mail-user="{email}"
 #SBATCH --export=ALL
 #SBATCH --mail-type="BEGIN, END, FAIL"
-#SBATCH -N {nodes}
-#SBATCH -n {nodes*cpus_per_node}
+#>SBATCH -N {nodes}
+#>SBATCH -n {nodes*cpus_per_node}
 #>
 #> Note: The following options aren't enabled by default.
 #>       They serve as a guide to users that wish to pass
 #>       more options to the batch system.
 #>
-#SBATCH --mem=100G
+#SBATCH --mem=250G
 #> #SBATCH --gpus=v100-16:{gpus_per_node*nodes}
 
 
@@ -76,7 +77,7 @@ module load gcc/10.2
 #>      "{MFC::BIN}"
 #>
 mpirun                           \
-       -np {cpus_per_node*nodes} \
+#>       -np {cpus_per_node*nodes} \
         "{MFC::BIN}"
 #>
 
