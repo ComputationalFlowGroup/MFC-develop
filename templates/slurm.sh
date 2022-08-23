@@ -27,9 +27,9 @@
 #>   intended to be modified by users.
 #>
 #SBATCH --job-name="{name}"
-#SBATCH --nodes {nodes}
+#SBATCH --nodes={nodes}
 #SBATCH --ntasks-per-node={cpus_per_node}
-#SBATCH --cpus-per-task=1
+#>SBATCH --cpus-per-task=1
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
 #SBATCH --output="{name}.out"
@@ -45,7 +45,7 @@
 #>       They serve as a guide to users that wish to pass
 #>       more options to the batch system.
 #>
-#SBATCH --mem=250G
+#>SBATCH --mem=250G
 #> #SBATCH --gpus=v100-16:{gpus_per_node*nodes}
 
 
@@ -57,6 +57,8 @@
 
 module load mpi/openmpi_4.1.1_gcc_10.2_slurm20
 module load gcc/10.2
+module load cuda/11.1.1
+module load nvhpc-sdk/2022
 #>
 #> Note: The MFC prologue sets up the environment required
 #>       prior to execution.
@@ -76,7 +78,7 @@ module load gcc/10.2
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
 #>
-mpirun                           \
+srun --mpi=pmix                    \
 #>       -np {cpus_per_node*nodes} \
         "{MFC::BIN}"
 #>
