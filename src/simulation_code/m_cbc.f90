@@ -89,6 +89,8 @@ MODULE m_cbc
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) :: dalpha_rho_ds !< Spatial derivatives in s-dir of partial density
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dvel_ds !< Spatial derivatives in s-dir of velocity
     REAL(KIND(0d0))                            ::      dpres_ds !< Spatial derivatives in s-dir of pressure
+    REAL(KIND(0d0))                            ::      dpres_ds2 !< Spatial derivatives in s-dir of pressure
+    REAL(KIND(0d0))                            ::      dpres_ds3 !< Spatial derivatives in s-dir of pressure
     REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::       dadv_ds !< Spatial derivatives in s-dir of advection variables
 !    REAL(KIND(0d0)), ALLOCATABLE, DIMENSION(:) ::     dtau_e_ds !< Spatial derivatives in s-dir of elastic shear stress
     !! Note that these are only obtained in those cells on the domain boundary along which the
@@ -891,7 +893,25 @@ MODULE m_cbc
         END SUBROUTINE s_compute_slip_wall_L ! ---------------------------------
         
         
-        
+         !>  The L variables for the slip wall CBC, see pg. 451 of
+        !!      Thompson (1990). At the slip wall (frictionless wall),
+        !!      the normal component of velocity is zero at all times,
+        !!      while the transverse velocities may be nonzero.        
+        !!  @param dflt_int Default null integer
+        SUBROUTINE s_compute_no_slip_wall_L(dflt_int) ! -----------------------------------
+
+            
+        INTEGER, INTENT(IN) :: dflt_int
+            
+            L(1) = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
+            
+            L(2:adv_idx%end-1) = 0d0
+            
+            L(adv_idx%end) = L(1)
+            
+            
+        END SUBROUTINE s_compute_no_slip_wall_L ! ---------------------------------
+       
         
         !>  The L variables for the nonreflecting subsonic buffer CBC
         !!      see pg. 13 of Thompson (1987). The nonreflecting subsonic

@@ -87,16 +87,26 @@ MODULE m_phase_change
 
     !> @name Parameters for the phase change part of the code
     !> @{
-    INTEGER,         PARAMETER :: newton_iter       = 50        !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-13    !< p_relaxk \alpha threshold,           set to 1E-15
-    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-13    !< Saturation temperature tol,          set to 1E-10
-    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-13    !< Saturation pTg tolerance,            set to 1.d-10
-    REAL(KIND(0d0)), PARAMETER :: pres_crit         = 22.06d6   !< Critical water pressure              set to 22.06d6
-    REAL(KIND(0d0)), PARAMETER :: T_crit            = 700.d0    !< Critical water temperature           set to 648
-    REAL(KIND(0d0)), PARAMETER :: TsatHv            = 1000.d0   !< Saturation temperature threshold,    set to 900
-    REAL(KIND(0d0)), PARAMETER :: TsatLv            = 250.d0    !< Saturation temperature threshold,    set to 250
-    !REAL(KIND(0d0)), PARAMETER :: palpha_eps        = 1.d-9     !< p_relax high \alpha tolerance,       set to 1.d-6
-    !REAL(KIND(0d0)), PARAMETER :: ptgalpha_eps      = 1.d-6     !< Saturation p-T-mu alpha tolerance,   set to 1.d-6
+    INTEGER,         PARAMETER :: newton_iter       = 50        
+    !< p_relaxk \alpha iter,                set to 25
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-15
+    !< p_relaxk \alpha threshold,           set to 1E-15
+    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-10    
+    !< Saturation temperature tol,          set to 1E-10
+    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-10    
+    !< Saturation pTg tolerance,            set to 1.d-10
+    REAL(KIND(0d0)), PARAMETER :: pres_crit         = 22.06d6   
+    !< Critical water pressure              set to 22.06d6
+    REAL(KIND(0d0)), PARAMETER :: T_crit            = 648.d0    
+    !< Critical water temperature           set to 648
+    REAL(KIND(0d0)), PARAMETER :: TsatHv            = 900.d0   
+    !< Saturation temperature threshold,    set to 900
+    REAL(KIND(0d0)), PARAMETER :: TsatLv            = 275.d0    
+    !< Saturation temperature threshold,    set to 250
+    !REAL(KIND(0d0)), PARAMETER :: palpha_eps        = 1.d-9     
+    !< p_relax high \alpha tolerance,       set to 1.d-6
+    !REAL(KIND(0d0)), PARAMETER :: ptgalpha_eps      = 1.d-6     
+    !< Saturation p-T-mu alpha tolerance,   set to 1.d-6
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -767,27 +777,27 @@ MODULE m_phase_change
                         IF (relax) THEN
                            DO i = 1, num_fluids
                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
-                               Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)*fluid_pp(i)%gamma 
+                               Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
                                rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
                                !PRINT *, 'alpha :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
                            END DO                   
                            pres_relax = (rhoe - pi_inf)/gamma
-                           Tmix = (pres_relax*gamma+Bsum)/rcv
+                           Tmix = gamma*(pres_relax+Bsum)/rcv
                            !PRINT *, 'rhoe :: ',rhoe,', Bsum :: ',Bsum,', rcv :: ',rcv
                            !PRINT *, 'Tmix :: ',Tmix,', pres :: ',pres_relax
                            IF(pres_relax .LT. pres_crit .AND. Tmix .LT. T_crit) THEN
                              Tsat = f_Tsat(pres_relax)
-                             !DO i = 1, 1
-                             !  Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                             !       -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                             !       /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                             !       -fluid_pp(i)%pi_inf & 
-                             !       /(1.d0+fluid_pp(i)%gamma)) &
-                             !       /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
-                             !       /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
-                             !END DO
-                             IF (Tmix .LT. Tsat) relax = .FALSE.
-                             IF (Tmix .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
+                             DO i = 1, 1
+                               Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                    -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
+                                    -fluid_pp(i)%pi_inf & 
+                                    /(1.d0+fluid_pp(i)%gamma)) &
+                                    /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
+                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
+                             END DO
+                             IF (Tk(1) .LT. Tsat) relax = .FALSE.
+                             IF (Tk(1) .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
                              !PRINT *,'Tk(1) :: ',Tk(1),', Tk(2) ::',Tk(2)
                            ELSE
                              relax = .FALSE.
@@ -843,11 +853,11 @@ MODULE m_phase_change
                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. 1d0) & 
                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = 1d0
                sum_alpha = sum_alpha + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-             END DO
-             DO i = 1, num_fluids
+            END DO
+            DO i = 1, num_fluids
                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) / sum_alpha
-             END DO
+            END DO
 
         END SUBROUTINE s_mixture_volume_fraction_correction
 
@@ -1409,6 +1419,7 @@ MODULE m_phase_change
             REAL(KIND(0d0))                :: factor, Tstar
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)            :: j, k, l
+            INTEGER                        :: i
             !pstarA = 100.d0
             !pstarB = 5.d2
             pstarA = 1.d0
@@ -1420,8 +1431,9 @@ MODULE m_phase_change
                   IF (pstarA .GT. 1.d12) THEN
                          PRINT *, 'PT-k bracketing failed to find lower bound'
                          PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
-                         PRINT *, 'alpha1 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
-                         PRINT *, 'alpha2 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
+                         DO i = 1, num_fluids
+                            PRINT *, 'alpha',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                         END DO
                          CALL s_mpi_abort()
                   END IF
                   fA = fB
