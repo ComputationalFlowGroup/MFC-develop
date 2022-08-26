@@ -458,8 +458,8 @@ MODULE m_data_output
                      ELSEIF(model_eqns == 3) THEN
                         c = 0d0
                         DO i = 1, num_fluids
-                            c = c + q_prim_vf(i+adv_idx%beg-1)%sf(j,k,l)*(1.d0/fluid_pp(i)%gamma+1.d0)*&
-                                (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1.d0))/rho
+                            c = c + q_prim_vf(i+cont_idx%beg-1)%sf(j,k,l)*(1.d0/fluid_pp(i)%gamma+1.d0)*&
+                                (pres + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1.d0))/rho**2
                         END DO
                      ELSE
                          DO i = 1, crv_size

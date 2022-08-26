@@ -89,11 +89,11 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-15
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-13
     !< p_relaxk \alpha threshold,           set to 1E-15
     REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-10    
     !< Saturation temperature tol,          set to 1E-10
-    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-10    
+    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-8
     !< Saturation pTg tolerance,            set to 1.d-10
     REAL(KIND(0d0)), PARAMETER :: pres_crit         = 22.06d6   
     !< Critical water pressure              set to 22.06d6
@@ -814,7 +814,10 @@ MODULE m_phase_change
                                    (fluid_pp(2)%cv*Trelax)
                             ! Calculate vapor and liquid volume fractions
                             a1 = (rho-rho2)/(rho1-rho2)
-                            a2 = 1.d0 - a1 - q_cons_vf(2+adv_idx%beg)%sf(j,k,l)
+                            a2 = 1.d0 - a1
+                            DO i = 1, num_fluids-2
+                               a2 = a2 - q_cons_vf(i+1+adv_idx%beg)%sf(j,k,l)
+                            END DO
                             ! Cell update of the volume fraction
                             q_cons_vf(cont_idx%beg)%sf(j,k,l)   = rho1*a1
                             q_cons_vf(1+cont_idx%beg)%sf(j,k,l) = rho2*a2
@@ -1279,6 +1282,7 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf, pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j,k,l
+            INTEGER                        :: i
             !pstarA = 100.d0
             !pstarB = 5.d2
             pstarA = 1.d-15
@@ -1290,8 +1294,9 @@ MODULE m_phase_change
                   IF (pstarA .GT. 1.d13) THEN
                          PRINT *, 'P-K bracketing failed to find lower bound'
                          PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
-                         PRINT *, 'alpha1 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
-                         PRINT *, 'alpha2 :: ',q_cons_vf(adv_idx%beg)%sf(j,k,l)
+                         DO i = 1, num_fluids
+                            PRINT *, 'alpha',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                         END DO
                          CALL s_mpi_abort()
                   END IF
                   fA = fB
@@ -1388,19 +1393,24 @@ MODULE m_phase_change
             INTEGER                                              :: i
             Tdem = 0.d0; dTdp = 0.d0; fA = 0.d0; df = 0.d0;
             DO i = 1, num_fluids
-                  Tdemk = (q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
-                       *((pres_inf(i)*(gamma_min(i)-1.d0))/(pstar+pres_inf(i)) + 1.d0))  
+                  !Tdemk = (q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
+                  !     *((pres_inf(i)*(gamma_min(i)-1.d0))/(pstar+pres_inf(i)) + 1.d0))  
+                  Tdemk = gamma_min(i)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
+                        *fluid_pp(i)%cv
                   fk = (q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv & 
                         *(gamma_min(i)-1.d0))/(pstar+pres_inf(i))
                   Tdem = Tdem + Tdemk
-                  dTdp = dTdp + ((pres_inf(i)*(gamma_min(i)-1.d0)) &
-                         /(pstar+pres_inf(i))**2)/(Tdemk**2)
+                  !dTdp = dTdp + ((pres_inf(i)*(gamma_min(i)-1.d0)) &
+                  !       /(pstar+pres_inf(i))**2)/(Tdemk**2)
+                  !dTdp = dTdp + 1.d0/Tdemk
                   fA = fA + fk
-                  df = df + fk/(pstar+pres_inf(i))
+                  df = df - fk/(pstar+pres_inf(i))
             END DO
-            Tstar = rhoe/Tdem
+            !Tstar = rhoe/Tdem
+            Tstar = (rhoe + pstar)/Tdem
             fp = 1.d0 - Tstar*fA
-            dfdp = Tstar*df-rhoe*dTdp
+            !dfdp = Tstar*df-rhoe*dTdp
+            dfdp = -Tstar*df-fA/Tdem
 
         END SUBROUTINE s_compute_ptk_fdf !------------------------
 
@@ -1420,17 +1430,17 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            !pstarA = 100.d0
-            !pstarB = 5.d2
-            pstarA = 1.d0
-            pstarB = 1.d5
+            pstarA = 1.d2
+            pstarB = 1.d3
+            !pstarA = 1.d0
+            !pstarB = 1.d5
             CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
                   IF (pstarA .GT. 1.d12) THEN
                          PRINT *, 'PT-k bracketing failed to find lower bound'
-                         PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
+                         !PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
                          DO i = 1, num_fluids
                             PRINT *, 'alpha',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
                          END DO

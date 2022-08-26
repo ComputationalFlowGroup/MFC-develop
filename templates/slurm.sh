@@ -30,6 +30,7 @@
 #SBATCH --nodes={nodes}
 #SBATCH --ntasks-per-node={cpus_per_node}
 #>SBATCH --cpus-per-task=1
+#SBATCH --constraint=cascade
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
 #SBATCH --output="{name}.out"
