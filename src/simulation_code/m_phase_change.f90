@@ -89,7 +89,7 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-8
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-10
     !< p_relaxk \alpha threshold,           set to 1E-15
     REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-8
     !< Saturation temperature tol,          set to 1E-10
@@ -531,17 +531,24 @@ MODULE m_phase_change
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! PT RELAXATION==============================================
-                        rhoe = 0.d0
+                        relax = .FALSE.
                         DO i = 1, num_fluids
-                             rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
-                                         - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
-                        END DO                   
-                        CALL s_compute_pt_relax_k(pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
-                        DO i = 1, num_fluids
-                             q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
-                              (gamma_min(i)-1.d0)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
-                              *fluid_pp(i)%cv*Tstar/(pstar+pres_inf(i))
+                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) .AND. & 
+                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. ptgalpha_eps)) relax = .TRUE.
                         END DO
+                        rhoe = 0.d0
+                        IF (relax) THEN
+                            DO i = 1, num_fluids
+                               rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
+                                           - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
+                            END DO                   
+                            CALL s_compute_pt_relax_k(pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+                            DO i = 1, num_fluids
+                               q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
+                                    (gamma_min(i)-1.d0)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
+                                    *fluid_pp(i)%cv*Tstar/(pstar+pres_inf(i))
+                            END DO
+                        END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                     END DO
                 END DO
@@ -714,14 +721,15 @@ MODULE m_phase_change
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
-                        relax = .TRUE.
                         ! Numerical correction of the volume fractions
                         IF (mpp_lim) THEN
                             CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         END IF
                         ! P RELAXATION==============================================
+                        relax = .FALSE.
                         DO i = 1, num_fluids
-                            IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. (1.d0-palpha_eps)) relax = .FALSE.
+                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
+                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
                         END DO
                         IF (relax) THEN
                             DO i = 1, num_fluids
@@ -736,7 +744,7 @@ MODULE m_phase_change
                             CALL s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
-                                IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) & 
+                                !IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) & 
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                     q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                             END DO
@@ -744,9 +752,9 @@ MODULE m_phase_change
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! PT RELAXATION==============================================
                         relax = .FALSE.
-                        DO i = 1, num_fluids-1
-                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
-                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
+                        DO i = 1, num_fluids
+                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) .AND. & 
+                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. ptgalpha_eps)) relax = .TRUE.
                         END DO
                         rhoeq = 0.d0
                         IF (relax) THEN
@@ -1292,8 +1300,8 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j,k,l
             INTEGER                        :: i
-            pstarA = 1.d-3
-            pstarB = 1.d4
+            pstarA = 1.d-6
+            pstarB = 1.d3
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
             factor = 10.d0
