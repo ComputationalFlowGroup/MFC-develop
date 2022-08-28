@@ -2184,13 +2184,13 @@ MODULE m_riemann_solvers
                 c_L = 0d0
                 c_R = 0d0
                 DO i = 1, num_fluids
-                    c_L = c_L + qL_prim_rs_vf(i+adv_idx%beg-1)%sf( j ,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                    c_L = c_L + qL_prim_rs_vf(i+cont_idx%beg-1)%sf( j ,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
                         (qL_prim_rs_vf(E_idx)%sf( j ,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
-                    c_R = c_R + qR_prim_rs_vf(i+adv_idx%beg-1)%sf(j+1,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
+                    c_R = c_R + qR_prim_rs_vf(i+cont_idx%beg-1)%sf(j+1,k,l) * (1d0/fluid_pp(i)%gamma+1d0) * &
                         (qR_prim_rs_vf(E_idx)%sf(j+1,k,l) + fluid_pp(i)%pi_inf/(fluid_pp(i)%gamma+1d0))
                 END DO
-                c_L = c_L/rho_L
-                c_R = c_R/rho_R
+                c_L = c_L/rho_L**2
+                c_R = c_R/rho_R**2
             ELSEIF ( (model_eqns == 4) .OR. (model_eqns == 2 .AND. bubbles) ) THEN 
                 ! Sound speed for bubble mmixture to order O(\alpha)
                 DO i = 1,num_fluids

@@ -668,6 +668,13 @@ MODULE m_global_parameters
                     internalEnergies_idx%end  = adv_idx%end + num_fluids
                     sys_size     = internalEnergies_idx%end                       
 
+                    IF (hypoelasticity) THEN
+                        stress_idx%beg = sys_size + 1
+                        stress_idx%end = sys_size + (num_dims*(num_dims+1)) / 2
+                        ! number of distinct stresses is 1 in 1D, 3 in 2D, 6 in 3D
+                        sys_size = stress_idx%end
+                    END IF
+
                 ELSE IF(model_eqns == 4) THEN
                     cont_idx%beg = 1 ! one continuity equation
                     cont_idx%end = 1 !num_fluids
