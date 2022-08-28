@@ -89,9 +89,9 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-12
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-8
     !< p_relaxk \alpha threshold,           set to 1E-15
-    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-10
+    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-8
     !< Saturation temperature tol,          set to 1E-10
     REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-8
     !< Saturation pTg tolerance,            set to 1.d-10
@@ -1292,10 +1292,8 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j,k,l
             INTEGER                        :: i
-            !pstarA = 100.d0
-            !pstarB = 5.d2
             pstarA = 1.d-3
-            pstarB = 1.d2
+            pstarB = 1.d4
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
             factor = 10.d0
@@ -1439,9 +1437,7 @@ MODULE m_phase_change
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
             pstarA = 1.d-3
-            pstarB = 1.d2
-            !pstarA = 1.d0
-            !pstarB = 1.d5
+            pstarB = 1.d4
             CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
             factor = 10.d0
