@@ -149,11 +149,12 @@ MODULE m_phase_change
             gibbsD = (n1*fluid_pp(1)%cv - fluid_pp(1)%cv) / & 
                      (n2*fluid_pp(2)%cv - fluid_pp(2)%cv)
 
-            ALLOCATE( gamma_min(1:num_fluids), pres_inf(1:num_fluids) )
+            ALLOCATE( gamma_min(1:num_fluids) )
+            ALLOCATE( pres_inf(1:num_fluids) )
 
             DO i = 1, num_fluids
-                gamma_min(i) = 1d0/fluid_pp(i)%gamma + 1d0
-                pres_inf(i)  = fluid_pp(i)%pi_inf / (1d0+fluid_pp(i)%gamma)
+                gamma_min(i) = 1.d0/fluid_pp(i)%gamma + 1.d0
+                pres_inf(i)  = fluid_pp(i)%pi_inf / (1.d0+fluid_pp(i)%gamma)
             END DO
             ! Associating procedural pointer to the subroutine that will be
             ! utilized to calculate the solution of a given Riemann problem
@@ -208,9 +209,7 @@ MODULE m_phase_change
             REAL(KIND(0d0))                                   ::  mdotalpha, mdotrhoe
             REAL(KIND(0d0)), DIMENSION(2)                     ::          Re
             REAL(KIND(0d0)), DIMENSION(num_fluids,num_fluids) ::          We
-
             INTEGER :: i,j,k,l,r !< Generic loop iterators
-
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
@@ -220,11 +219,9 @@ MODULE m_phase_change
 
                        IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps .OR. &
                            q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) THEN
-       
                        ! computing n_k, pinf_k, p_k, T_k, and g_k for finite relaxation
                        phi = 0.d0; psi = 0.d0; f1 = 0.d0; f2 = 0.d0; f3 = 0.d0; f4 = 0.d0;
                        !rhoe = 0.d0;
-
                        DO i = 1, num_fluids
                           n_k    = 1.d0/fluid_pp(i)%gamma + 1.d0
                           pinf_k = fluid_pp(i)%pi_inf/(1.d0 + fluid_pp(i)%gamma)
@@ -347,7 +344,6 @@ MODULE m_phase_change
                     END DO
                 END DO
             END DO
-
         END SUBROUTINE s_infinite_p_relaxation ! ----------------
 
         !>  The purpose of this procedure is to infinitely relax
@@ -371,7 +367,6 @@ MODULE m_phase_change
             !> @}
             INTEGER :: i, j, k, l        !< Generic loop iterators
             LOGICAL :: relax             !< Relaxation procedure determination variable
-
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
@@ -396,7 +391,6 @@ MODULE m_phase_change
                             q_cons_vf(2+adv_idx%beg-1)%sf(j,k,l) = 1.d0 - a1
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
-
                         ! PT RELAXATION ==================================
                         rhoe = 0.d0
                         relax = .FALSE.
@@ -449,7 +443,6 @@ MODULE m_phase_change
             INTEGER :: i, j, k, l        !< Generic loop iterators
             LOGICAL :: relax             !< Relaxation procedure determination variable
             !< Computing the constant saturation properties 
-
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
@@ -593,7 +586,7 @@ MODULE m_phase_change
                               !IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) & 
                               !      pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-0
                             END DO
-                            CALL s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                            CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
                                 IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) & 
@@ -623,13 +616,12 @@ MODULE m_phase_change
             ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf         
             REAL(KIND(0d0)), DIMENSION(num_fluids) ::     rho_K_s, pres_K_init
-            REAL(KIND(0d0)), DIMENSION(num_fluids) ::   gamma_min, pres_inf
+            !REAL(KIND(0d0)), DIMENSION(num_fluids) ::   gamma_min, pres_inf
             REAL(KIND(0d0))                        ::     rhoe, pstar, Tstar
             ! Generic loop iterators
             INTEGER :: i,j,k,l
             ! Relaxation procedure determination variable
             LOGICAL :: relax
-
             DO j = 0, m
                 DO k = 0, n
                     DO l = 0, p
@@ -659,9 +651,9 @@ MODULE m_phase_change
                                     !pres_K_init(i) = 1E5
                                     !CALL s_mpi_abort()
                                 !END IF
-                                IF (pres_K_init(i) .LT. 0.d0 .AND. pres_inf(i) == 0.d0 ) pres_K_init(i) = sgm_eps
+                                !IF (pres_K_init(i) .LT. 0.d0 .AND. pres_inf(i) == 0.d0 ) pres_K_init(i) = 1.d-6
                            END DO
-                           CALL s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                           CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                            ! Cell update of the volume fraction
                            DO i = 1, num_fluids
                              IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) & 
@@ -682,7 +674,7 @@ MODULE m_phase_change
                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
                                            - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
                             END DO                   
-                            CALL s_compute_pt_relax_k(pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+                            CALL s_compute_pt_relax_k(pstar,Tstar,rhoe,q_cons_vf,j,k,l)
                             DO i = 1, num_fluids
                                q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                     (gamma_min(i)-1.d0)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
@@ -710,7 +702,7 @@ MODULE m_phase_change
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf 
             REAL(KIND(0d0))                                   :: pres_relax, Trelax
             REAL(KIND(0d0)), DIMENSION(num_fluids)            :: pres_K_init, rho_K_s, Tk
-            REAL(KIND(0d0)), DIMENSION(num_fluids)            :: gamma_min, pres_inf
+            !REAL(KIND(0d0)), DIMENSION(num_fluids)            :: gamma_min, pres_inf
             REAL(KIND(0d0))                                   :: rhoalpha1, rhoalpha2
             REAL(KIND(0d0))                                   :: rho, rhoe, rhoeq
             REAL(KIND(0d0))                                   :: rcv, Bsum, Tmix
@@ -747,7 +739,7 @@ MODULE m_phase_change
                               IF (pres_K_init(i) .LE. -(1d0 - 1d-8)*pres_inf(i) + 1d-8) & 
                                   pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-0
                             END DO
-                            CALL s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                            CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
                                 !IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) & 
@@ -768,7 +760,7 @@ MODULE m_phase_change
                                rhoeq = rhoeq + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) &
                                            - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
                             END DO                   
-                            CALL s_compute_pt_relax_k(pres_relax,Trelax,rhoeq,gamma_min,pres_inf,q_cons_vf,j,k,l)
+                            CALL s_compute_pt_relax_k(pres_relax,Trelax,rhoeq,q_cons_vf,j,k,l)
                             DO i = 1, num_fluids
                                 q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                 (gamma_min(i)-1.d0)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
@@ -881,7 +873,6 @@ MODULE m_phase_change
                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                    q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) / sum_alpha
             END DO
-
         END SUBROUTINE s_mixture_volume_fraction_correction
 
         !> @name Relaxed pressure, initial partial pressures, function f(p) and its partial
@@ -1115,8 +1106,8 @@ MODULE m_phase_change
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
             !> @{
-            REAL(KIND(0d0)), INTENT(IN)    :: pstar, rho0, E0
-            REAL(KIND(0d0)), INTENT(OUT)   :: fp, dfdp, Tstar
+            REAL(KIND(0d0)), INTENT(IN)    ::   pstar, rho0, E0
+            REAL(KIND(0d0)), INTENT(OUT)   ::   fp, dfdp, Tstar
             REAL(KIND(0d0))                ::  cv1, cv2, q1, q2
             REAL(KIND(0d0))                ::        ap, bp, dp
             REAL(KIND(0d0))                ::  dadp, dbdp, dddp
@@ -1250,7 +1241,7 @@ MODULE m_phase_change
         !!         temperature by using a Newton-Raphson method from the provided
         !!         equilibrium pressure and EoS of the binary phase system.
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1260,7 +1251,8 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)                         :: fp, dfdp
             REAL(KIND(0d0)), INTENT(IN)                          :: pstar
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf, pres_K_init
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0))                                      :: numerator, denominator
             REAL(KIND(0d0))                                      :: drhodp
             INTEGER, INTENT(IN)                                  :: j, k, l
@@ -1278,13 +1270,12 @@ MODULE m_phase_change
                   dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
                      drhodp / (rho_K_s(i)*rho_K_s(i))
             END DO
-
         END SUBROUTINE s_compute_pk_fdf !------------------------
 
         !>     The purpose of this subroutine is to determine the bracket of 
         !!         the pressure by finding the pressure at which b^2=4*a*c
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_pk_bracket(pstarA,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_pk_bracket(pstarA,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1293,22 +1284,28 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)   :: pstarA, pstarB
             REAL(KIND(0d0))                :: fA, fB, dfdp
             REAL(KIND(0d0))                :: factor
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf, pres_K_init
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j,k,l
             INTEGER                        :: i
-            pstarB = 1d1*MAXVAL(pres_K_init)
-            pstarA = 1d-1*MINVAL(pres_K_init)
-            IF (pstarB*pstarA .LT. 0.d0 .AND. pstarB .GT. 0.d0) THEN 
-                  pstarA = 1.d-6 
-                  pstarB = 1.d0 
-            END IF
-            IF (pstarB*pstarA .GT. 0.d0 .AND. pstarB .LT. 0.d0) THEN
-                  pstarB = 1d-1*MAXVAL(pres_K_init)
-                  pstarA = 1d1*MINVAL(pres_K_init)
-            END IF
-            CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
-            CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+            !pstarB = MAXVAL(pres_K_init)
+            !pstarA = MINVAL(pres_K_init)
+            !IF (pstarB*pstarA .LT. 0.d0 .AND. pstarB .GT. 0.d0) THEN 
+            !      pstarA = 1.d-6
+            !      pstarB = pstarB*1.d1
+            !      !pstarB = 1.d2
+            !ELSEIF (pstarB*pstarA .GT. 0.d0 .AND. pstarB .GT. 0.d0) THEN
+            !      pstarB = pstarB*1.d1
+            !      pstarA = pstarA*1.d-1
+            !ELSEIF (pstarB*pstarA .GT. 0.d0 .AND. pstarB .LT. 0.d0) THEN
+            !      pstarB = pstarB*1.d-1
+            !      pstarA = pstarA*1.d1
+            !END IF
+            pstarA = 1.d-3
+            pstarB = 1.d2
+            CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+            CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
                   IF (pstarA .GT. 1.d12 .OR. ieee_is_nan(fB) .OR. ieee_is_nan(fA)) THEN
@@ -1325,12 +1322,12 @@ MODULE m_phase_change
                      fA = fB
                      pstarA = pstarB
                      pstarB = pstarA*factor
-                     CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                     CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   ELSE
                      fB = fA
                      pstarB = pstarA
                      pstarA = pstarB*factor
-                     CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                     CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   END IF
             END DO
         END SUBROUTINE s_compute_pk_bracket
@@ -1339,7 +1336,7 @@ MODULE m_phase_change
         !!         temperature by using a Newton-Raphson method from the provided
         !!         equilibrium pressure and EoS of the binary phase system.
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_p_relax_k(rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1348,15 +1345,16 @@ MODULE m_phase_change
             REAL(KIND(0d0))                                      :: pstar, pstarA, pstarB
             REAL(KIND(0d0))                                      :: delta, delta_old, fp, dfdp
             REAL(KIND(0d0))                                      :: fL, fH, pstarL, pstarH
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf, pres_K_init
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s 
             INTEGER, INTENT(IN)                                  :: j,k,l
             INTEGER :: iter                !< Generic loop iterators
             ! Computing the bracket of the root solution
-            CALL s_compute_pk_bracket(pstarA,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+            CALL s_compute_pk_bracket(pstarA,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             ! Computing f at lower and higher end of the bracket
-            CALL s_compute_pk_fdf(fL,dfdp,pstarA,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
-            CALL s_compute_pk_fdf(fH,dfdp,pstarB,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+            CALL s_compute_pk_fdf(fL,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+            CALL s_compute_pk_fdf(fH,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             ! Establishing the direction of the descent to find zero
             IF(fL < 0.d0) THEN
                 pstarL  = pstarA; pstarH  = pstarB;
@@ -1366,7 +1364,7 @@ MODULE m_phase_change
             pstar = 0.5d0*(pstarA+pstarB)
             delta_old = DABS(pstarB-pstarA)
             delta = delta_old
-            CALL s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+            CALL s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             ! Combining bisection and newton-raphson methods
             DO iter = 0, newton_iter
                 IF ((((pstar-pstarH)*dfdp-fp)*((pstar-pstarL)*dfdp-fp) > 0.d0) & ! Bisect if Newton out of range,
@@ -1383,7 +1381,7 @@ MODULE m_phase_change
                 END IF
                 IF (DABS(delta/pstar) < pknewton_eps) EXIT           ! Stopping criteria
                 ! Updating to next iteration
-                CALL s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,gamma_min,pres_inf,pres_K_init,q_cons_vf,j,k,l)
+                CALL s_compute_pk_fdf(fp,dfdp,pstar,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                 IF (fp < 0.d0) THEN !Maintain the bracket on the root
                    pstarL = pstar
                 ELSE
@@ -1399,7 +1397,7 @@ MODULE m_phase_change
         !!         temperature by using a Newton-Raphson method from the provided
         !!         equilibrium pressure and EoS of the binary phase system.
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1408,7 +1406,7 @@ MODULE m_phase_change
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)  :: q_cons_vf
             REAL(KIND(0d0)), INTENT(OUT)                         :: fp, dfdp, Tstar
             REAL(KIND(0d0)), INTENT(IN)                          :: rhoe, pstar
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             REAL(KIND(0d0))                                      :: Tdem, dTdp, fA
             REAL(KIND(0d0))                                      :: df, fk, Tdemk
             INTEGER, INTENT(IN)                                  :: j, k, l
@@ -1439,7 +1437,7 @@ MODULE m_phase_change
         !>     The purpose of this subroutine is to determine the bracket of 
         !!         the pressure by finding the pressure at which b^2=4*a*c
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_ptk_bracket(pstarA,pstarB,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_ptk_bracket(pstarA,pstarB,rhoe,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1449,13 +1447,13 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(IN)    :: rhoe
             REAL(KIND(0d0))                :: fA, fB, dfdp
             REAL(KIND(0d0))                :: factor, Tstar
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
             pstarA = 1.d-8
             pstarB = 1.d2
-            CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
-            CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
                   IF (pstarA .GT. 1.d12) THEN
@@ -1472,7 +1470,7 @@ MODULE m_phase_change
                   fA = fB
                   pstarA = pstarB
                   pstarB = pstarA*factor
-                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
                   IF( ieee_is_nan(fB) ) THEN
                         fB = fA
                         pstarB = pstarA
@@ -1487,7 +1485,7 @@ MODULE m_phase_change
         !!         temperature by using a Newton-Raphson method from the provided
         !!         equilibrium pressure and EoS of the binary phase system.
         !!     @param p_star equilibrium pressure at the interface    
-        SUBROUTINE s_compute_pt_relax_k(pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+        SUBROUTINE s_compute_pt_relax_k(pstar,Tstar,rhoe,q_cons_vf,j,k,l)
             !> @name In-subroutine variables: vapor and liquid material properties n, p_infinity
             !!       heat capacities, cv, reference energy per unit mass, q, coefficients for the
             !!       iteration procedure, A-D, and iteration variables, f and df
@@ -1498,14 +1496,14 @@ MODULE m_phase_change
             REAL(KIND(0d0))                                      :: pstarA, pstarB
             REAL(KIND(0d0))                                      :: delta, delta_old, fp, dfdp
             REAL(KIND(0d0))                                      :: fL, fH, pstarL, pstarH
-            REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)                                  :: j, k, l
             INTEGER :: iter                !< Generic loop iterators
             ! Computing the bracket of the root solution
-            CALL s_compute_ptk_bracket(pstarA,pstarB,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_bracket(pstarA,pstarB,rhoe,q_cons_vf,j,k,l)
             ! Computing f at lower and higher end of the bracket
-            CALL s_compute_ptk_fdf(fL,dfdp,pstarA,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
-            CALL s_compute_ptk_fdf(fH,dfdp,pstarB,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_fdf(fL,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_fdf(fH,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
             ! Establishing the direction of the descent to find zero
             IF(fL < 0.d0) THEN
                 pstarL  = pstarA; pstarH  = pstarB;
@@ -1515,7 +1513,7 @@ MODULE m_phase_change
             pstar = 0.5d0*(pstarA+pstarB)
             delta_old = DABS(pstarB-pstarA)
             delta = delta_old
-            CALL s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+            CALL s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,q_cons_vf,j,k,l)
             ! Combining bisection and newton-raphson methods
             DO iter = 0, newton_iter
                 IF ((((pstar-pstarH)*dfdp-fp)*((pstar-pstarL)*dfdp-fp) > 0.d0) & ! Bisect if Newton out of range,
@@ -1532,7 +1530,7 @@ MODULE m_phase_change
                 END IF
                 IF (DABS(delta/pstar) < pknewton_eps) EXIT           ! Stopping criteria
                 ! Updating to next iteration
-                CALL s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,gamma_min,pres_inf,q_cons_vf,j,k,l)
+                CALL s_compute_ptk_fdf(fp,dfdp,pstar,Tstar,rhoe,q_cons_vf,j,k,l)
                 IF (fp < 0.d0) THEN !Maintain the bracket on the root
                    pstarL = pstar
                 ELSE
@@ -1542,6 +1540,7 @@ MODULE m_phase_change
         END SUBROUTINE s_compute_pt_relax_k !-------------------------------
 
         SUBROUTINE s_finalize_relaxation_solver_module()
+           DEALLOCATE(gamma_min,pres_inf)
            s_relaxation_solver => NULL()
         END SUBROUTINE
 
