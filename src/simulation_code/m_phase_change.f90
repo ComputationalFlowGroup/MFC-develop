@@ -1112,7 +1112,6 @@ MODULE m_phase_change
             REAL(KIND(0d0))                ::        ap, bp, dp
             REAL(KIND(0d0))                ::  dadp, dbdp, dddp
             REAL(KIND(0d0))                ::              dTdp
-
             cv1 = fluid_pp(1)%cv; q1 = fluid_pp(1)%qv;
             cv2 = fluid_pp(2)%cv; q2 = fluid_pp(2)%qv;
             ! Calculating coefficients, Eq. C.6, Pelanti 2014
@@ -1151,7 +1150,6 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(IN)    :: pstar, rho0, E0
             REAL(KIND(0d0))                :: fA, fB, dfdp, Tstar
             REAL(KIND(0d0))                :: pS, factor
-
             pstarA = 0.7d0*pstar
             pstarB = pstar
             CALL s_compute_ptg_fdf(fA,dfdp,pstarA,Tstar,rho0,E0)
@@ -1284,51 +1282,47 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)   :: pstarA, pstarB
             REAL(KIND(0d0))                :: fA, fB, dfdp
             REAL(KIND(0d0))                :: factor
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
+            REAL(KIND(0d0))                :: pmaxK, pminK, apmaxK, apminK
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j,k,l
-            INTEGER                        :: i
-            !pstarB = MAXVAL(pres_K_init)
-            !pstarA = MINVAL(pres_K_init)
-            !IF (pstarB*pstarA .LT. 0.d0 .AND. pstarB .GT. 0.d0) THEN 
-            !      pstarA = 1.d-6
-            !      pstarB = pstarB*1.d1
-            !      !pstarB = 1.d2
-            !ELSEIF (pstarB*pstarA .GT. 0.d0 .AND. pstarB .GT. 0.d0) THEN
-            !      pstarB = pstarB*1.d1
-            !      pstarA = pstarA*1.d-1
-            !ELSEIF (pstarB*pstarA .GT. 0.d0 .AND. pstarB .LT. 0.d0) THEN
-            !      pstarB = pstarB*1.d-1
-            !      pstarA = pstarA*1.d1
-            !END IF
-            pstarA = 1.d-3
-            pstarB = 1.d2
+            INTEGER                        :: i, ipmaxK, ipminK
+            pmaxK = MAXVAL(pres_K_init)
+            ipmaxK = MAXLOC(pres_K_init,DIM=1)
+            pminK = MINVAL(pres_K_init)
+            ipminK = MINLOC(pres_K_init,DIM=1)
+            apmaxK = q_cons_vf(ipmaxK+adv_idx%beg-1)%sf(j,k,l)
+            apminK = q_cons_vf(ipminK+adv_idx%beg-1)%sf(j,k,l)
+            IF ( pmaxK*pminK .GT. 0.d0 .AND. pmaxK .LT. 0.d0 ) THEN
+               pstarA = -1.d-3
+               pstarB = -1.d2
+            ELSE IF ( (pmaxK*pminK .LE. 0.d0) .AND. (pmaxK*apmaxK .LT. DABS(pminK)*apminK) ) THEN
+               pstarA = -1.d-3
+               pstarB = -1.d2
+            ELSE 
+               pstarA = 1.d-2
+               pstarB = 1.d2
+            END IF
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
-                  IF (pstarA .GT. 1.d12 .OR. ieee_is_nan(fB) .OR. ieee_is_nan(fA)) THEN
-                         PRINT *, 'P-K bracketing failed to find lower bound'
-                         PRINT *, 'location j ',j,', k ',k,', l', l
-                         DO i = 1, num_fluids
-                            PRINT *, 'alpha ',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-                            PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
-                            PRINT *, 'p_K ',i,' :: ',pres_K_init(i)
-                         END DO
-                         CALL s_mpi_abort()
-                  END IF
-                  IF (pstarA .LT. pstarB) THEN
-                     fA = fB
-                     pstarA = pstarB
-                     pstarB = pstarA*factor
-                     CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-                  ELSE
-                     fB = fA
-                     pstarB = pstarA
-                     pstarA = pstarB*factor
-                     CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-                  END IF
+               IF (DABS(pstarA) .GT. 1.d18 .OR. ieee_is_nan(fB) .OR. ieee_is_nan(fA)) THEN
+                  PRINT *, 'P-K bracketing failed to find lower bound'
+                  PRINT *, 'location j ',j,', k ',k,', l', l
+                  PRINT *, 'pmaxK :: ',pmaxK,', pminK :: ',pminK
+                  PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
+                  DO i = 1, num_fluids
+                     PRINT *, 'alpha ',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                     PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
+                     PRINT *, 'p_K ',i,' :: ',pres_K_init(i)
+                  END DO
+                     CALL s_mpi_abort()
+               END IF
+               fA = fB
+               pstarA = pstarB
+               pstarB = pstarA*factor
+               CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             END DO
         END SUBROUTINE s_compute_pk_bracket
 
@@ -1345,7 +1339,6 @@ MODULE m_phase_change
             REAL(KIND(0d0))                                      :: pstar, pstarA, pstarB
             REAL(KIND(0d0))                                      :: delta, delta_old, fp, dfdp
             REAL(KIND(0d0))                                      :: fL, fH, pstarL, pstarH
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s 
             INTEGER, INTENT(IN)                                  :: j,k,l
@@ -1406,7 +1399,6 @@ MODULE m_phase_change
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)  :: q_cons_vf
             REAL(KIND(0d0)), INTENT(OUT)                         :: fp, dfdp, Tstar
             REAL(KIND(0d0)), INTENT(IN)                          :: rhoe, pstar
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             REAL(KIND(0d0))                                      :: Tdem, dTdp, fA
             REAL(KIND(0d0))                                      :: df, fk, Tdemk
             INTEGER, INTENT(IN)                                  :: j, k, l
@@ -1447,7 +1439,6 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(IN)    :: rhoe
             REAL(KIND(0d0))                :: fA, fB, dfdp
             REAL(KIND(0d0))                :: factor, Tstar
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
             pstarA = 1.d-8
@@ -1456,28 +1447,28 @@ MODULE m_phase_change
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
             factor = 10.d0
             DO WHILE ( fA*fB .GT. 0.d0 )
-                  IF (pstarA .GT. 1.d12) THEN
-                         PRINT *, 'PT-k bracketing failed to find lower bound'
-                         PRINT *, 'location j ',j,', k ',k,', l', l
-                         PRINT *, 'fA :: ',fA,', fB :: ',fB
-                         DO i = 1, num_fluids
-                            PRINT *, 'alpha ',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-                            PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
-                            PRINT *, 'rhoe  ',i,' :: ',q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
-                         END DO
-                         CALL s_mpi_abort()
-                  END IF
-                  fA = fB
-                  pstarA = pstarB
-                  pstarB = pstarA*factor
-                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-                  IF( ieee_is_nan(fB) ) THEN
-                        fB = fA
-                        pstarB = pstarA
-                        factor = factor*0.5d0
-                  ELSE 
-                        factor = 10.d0
-                  END IF
+               IF (pstarA .GT. 1.d12) THEN
+                  PRINT *, 'PT-k bracketing failed to find lower bound'
+                  PRINT *, 'location j ',j,', k ',k,', l', l
+                  PRINT *, 'fA :: ',fA,', fB :: ',fB
+                  DO i = 1, num_fluids
+                     PRINT *, 'alpha ',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
+                     PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
+                     PRINT *, 'rhoe  ',i,' :: ',q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l)
+                  END DO
+                  CALL s_mpi_abort()
+              END IF
+              fA = fB
+              pstarA = pstarB
+              pstarB = pstarA*factor
+              CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
+              IF( ieee_is_nan(fB) ) THEN
+                  fB = fA
+                  pstarB = pstarA
+                  factor = factor*0.5d0
+              ELSE 
+                  factor = 10.d0
+              END IF
             END DO
         END SUBROUTINE s_compute_ptk_bracket
 
@@ -1496,7 +1487,6 @@ MODULE m_phase_change
             REAL(KIND(0d0))                                      :: pstarA, pstarB
             REAL(KIND(0d0))                                      :: delta, delta_old, fp, dfdp
             REAL(KIND(0d0))                                      :: fL, fH, pstarL, pstarH
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             INTEGER, INTENT(IN)                                  :: j, k, l
             INTEGER :: iter                !< Generic loop iterators
             ! Computing the bracket of the root solution
