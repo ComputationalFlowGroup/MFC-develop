@@ -320,8 +320,6 @@ MODULE m_bubbles
 
             f_rddot_RP = (-1.5d0*(fV**2d0) + (fCpbw - fCp)/fRho)/fR
 
-            IF (Re_inv /= dflt_real) f_rddot_RP = f_rddot_RP - 4d0*Re_inv*fv/(fr**2d0)/fRho
-
         END FUNCTION f_rddot_RP
 
 
