@@ -1580,9 +1580,9 @@ MODULE m_rhs
 
             IF(t_step == t_step_stop) RETURN
             ! ==================================================================
-
+            IF (DEBUG) PRINT*, 'calling viscous effects'
             ! TODO : JS IS THIS LINE CORRECT?
-            IF (any(Re_size > 0) .OR. hypoelasticity) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
+            IF (any(Re_size > 0)) CALL s_get_viscous(q_cons_vf,q_prim_vf,rhs_vf)
 
             IF (DEBUG) print*, 'Before qbmm'
             ! compute required moments
