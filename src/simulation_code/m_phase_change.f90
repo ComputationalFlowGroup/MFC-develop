@@ -156,7 +156,7 @@ MODULE m_phase_change
                 pres_inf(i)  = fluid_pp(i)%pi_inf / (1.d0+fluid_pp(i)%gamma)
             END DO
             ! Associating procedural pointer to the subroutine that will be
-            ! utilized to calculate the solution of a given Riemann problem
+            ! utilized to calculate the solution of a given relaxation method
         
             ! Opening and writing the header of the run-time information file
             IF(relax_model == 0 .OR. relax_model == 1) THEN
@@ -1277,14 +1277,15 @@ MODULE m_phase_change
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             maxp = 1.d20; minp = -1.d20
             DO WHILE ( fA*fB .GT. 0.d0 )
-               IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.0d0 ) THEN
-                  pstarB = pstarA*bracket_factor*0.5d0
-                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               ELSE IF ( pstarA .GT. maxp ) THEN
+               !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.0d0 ) THEN
+               !   pstarB = pstarA*bracket_factor*0.5d0
+               !   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+               IF ( pstarA .GT. maxp ) THEN
                   pstarA = -1.d-6; pstarB = -1.d1;
                   CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) ) THEN
+               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. &
+                  ieee_is_nan(fB) ) THEN
                   PRINT *, 'P-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l,', pstarA :: ',pstarA
                   DO i = 1, num_fluids
@@ -1414,14 +1415,15 @@ MODULE m_phase_change
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
             maxp = 1.d20; minp = -1.d20;
             DO WHILE ( fA*fB .GT. 0.d0 )
-               IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.d0 ) THEN
-                  pstarB = pstarA*bracket_factor*0.5d0
-                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               ELSE IF ( pstarA .GT. maxp ) THEN
+               !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.d0 ) THEN
+               !   pstarB = pstarA*bracket_factor*0.5d0
+               !   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
+               IF ( pstarA .GT. maxp ) THEN
                   pstarA = -1.d-9; pstarB = -1.d1;
                   CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
                   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) ) THEN
+               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. &
+                  ieee_is_nan(fB) ) THEN
                   PRINT *, 'PT-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l
                   PRINT *, 'rhoe :: ',rhoe
