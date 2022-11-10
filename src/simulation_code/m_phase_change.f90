@@ -95,18 +95,17 @@ MODULE m_phase_change
     !< Saturation temperature tol,          set to 1E-10
     REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-8
     !< Saturation pTg tolerance,            set to 1.d-10
-    REAL(KIND(0d0)), PARAMETER :: pres_crit         = 22.06d6   
+    REAL(KIND(0d0)), PARAMETER :: pres_critH        = 22.06d6   
     !< Critical water pressure              set to 22.06d6
+    REAL(KIND(0d0)), PARAMETER :: pres_critL        = 1.d3
+    !< Critical water pressure              set to 1.d3
     REAL(KIND(0d0)), PARAMETER :: T_crit            = 648.d0    
     !< Critical water temperature           set to 648
     REAL(KIND(0d0)), PARAMETER :: TsatHv            = 900.d0   
     !< Saturation temperature threshold,    set to 900
     REAL(KIND(0d0)), PARAMETER :: TsatLv            = 275.d0    
-    !< Saturation temperature threshold,    set to 250
-    !REAL(KIND(0d0)), PARAMETER :: palpha_eps        = 1.d-9     
-    !< p_relax high \alpha tolerance,       set to 1.d-6
-    !REAL(KIND(0d0)), PARAMETER :: ptgalpha_eps      = 1.d-6     
-    !< Saturation p-T-mu alpha tolerance,   set to 1.d-6
+    !< factor for bracketing the solution,  set to 10
+    REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 10.d0
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -559,9 +558,9 @@ MODULE m_phase_change
             ! ones), shear and volume Reynolds numbers and the Weber numbers
             ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf         
-            REAL(KIND(0d0)), DIMENSION(num_fluids) ::     rho_K_s, pres_K_init
+            REAL(KIND(0d0)), DIMENSION(num_fluids) ::      rho_K_s, pres_K_init
             ! Generic loop iterators
-            INTEGER :: i,j,k,l
+            INTEGER :: i, j, k, l
             ! Relaxation procedure determination variable
             LOGICAL :: relax
             DO j = 0, m
@@ -579,10 +578,11 @@ MODULE m_phase_change
                         IF (relax) THEN
                             ! Calculating the initial pressure
                             DO i = 1, num_fluids
-                              pres_K_init(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                 -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                 /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                                 -fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                               pres_K_init(i) = &
+                                ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
+                                - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
+                                / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
+                                - fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
                             END DO
                             CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
@@ -592,8 +592,8 @@ MODULE m_phase_change
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                     q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                             END DO
+                            CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         END IF
-                        CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                     END DO
                 END DO
             END DO
@@ -615,7 +615,6 @@ MODULE m_phase_change
             ! Cell-average conservative variables
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf         
             REAL(KIND(0d0)), DIMENSION(num_fluids) ::     rho_K_s, pres_K_init
-            !REAL(KIND(0d0)), DIMENSION(num_fluids) ::   gamma_min, pres_inf
             REAL(KIND(0d0))                        ::     rhoe, pstar, Tstar
             ! Generic loop iterators
             INTEGER :: i,j,k,l
@@ -694,11 +693,10 @@ MODULE m_phase_change
             !> @{
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(INOUT) :: q_cons_vf 
             REAL(KIND(0d0))                                   :: pres_relax, Trelax
-            REAL(KIND(0d0)), DIMENSION(num_fluids)            :: pres_K_init, rho_K_s, Tk
-            !REAL(KIND(0d0)), DIMENSION(num_fluids)            :: gamma_min, pres_inf
+            REAL(KIND(0d0)), DIMENSION(num_fluids)            :: pres_K_init, rho_K_s
             REAL(KIND(0d0))                                   :: rhoalpha1, rhoalpha2
             REAL(KIND(0d0))                                   :: rho, rhoe, rhoeq
-            REAL(KIND(0d0))                                   :: rcv, Bsum, Tmix
+            REAL(KIND(0d0))                                   :: rcv, Bsum, Tmix, Tliquid
             REAL(KIND(0d0))                                   :: rho1, rho2
             REAL(KIND(0d0))                                   :: a1, a2
             REAL(KIND(0d0))                                   :: gamma, pi_inf, p_infk
@@ -748,8 +746,8 @@ MODULE m_phase_change
                         rhoeq = 0.d0
                         relax = .FALSE.
                         DO i = 1, num_fluids
-                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) .AND. & 
-                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. ptgalpha_eps)) relax = .TRUE.
+                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
+                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
                         END DO
                         IF (relax) THEN
                             DO i = 1, num_fluids
@@ -785,7 +783,6 @@ MODULE m_phase_change
                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
                                Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
                                rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
-                               !PRINT *, 'alpha :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
                            END DO                   
                            DO i = mom_idx%beg, mom_idx%end
                               dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * & 
@@ -794,21 +791,17 @@ MODULE m_phase_change
                            pres_relax = (q_cons_vf(E_idx)%sf(j,k,l) - dyn_pres - pi_inf)/gamma
                            !pres_relax = (rhoe - pi_inf)/gamma
                            Tmix = gamma*(pres_relax+Bsum)/rcv
-                           !PRINT *, 'rhoe :: ',rhoe,', Bsum :: ',Bsum,', rcv :: ',rcv
-                           !PRINT *, 'Tmix :: ',Tmix,', pres :: ',pres_relax
-                           IF(pres_relax .LT. pres_crit .AND. Tmix .LT. T_crit) THEN
+                           IF(pres_relax .LT. pres_critH .AND. pres_relax .GT. pres_critL .AND. Tmix .LT. T_crit) THEN
                              Tsat = f_Tsat(pres_relax)
-                             DO i = 1, 1
-                               Tk(i) = ((q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) & 
-                                    -q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
-                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
-                                    -fluid_pp(i)%pi_inf & 
-                                    /(1.d0+fluid_pp(i)%gamma)) &
-                                    /(q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
-                                    /q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)) 
-                             END DO
-                             IF (Tk(1) .LT. Tsat) relax = .FALSE.
-                             IF (Tk(1) .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
+                             Tliquid = ((q_cons_vf(internalEnergies_idx%beg)%sf(j,k,l) & 
+                                    -q_cons_vf(cont_idx%beg)%sf(j,k,l)*fluid_pp(1)%qv) &
+                                    /q_cons_vf(adv_idx%beg)%sf(j,k,l) &
+                                    -fluid_pp(1)%pi_inf & 
+                                    /(1.d0+fluid_pp(1)%gamma)) &
+                                    /(q_cons_vf(cont_idx%beg)%sf(j,k,l)*fluid_pp(1)%cv &
+                                    /q_cons_vf(adv_idx%beg)%sf(j,k,l)) 
+                             IF (Tliquid .LT. Tsat) relax = .FALSE.
+                             IF (Tliquid .GT. T_crit) relax = .FALSE. ! Critical temperature, originally set to 700
                            ELSE
                              relax = .FALSE.
                            END IF
@@ -825,7 +818,7 @@ MODULE m_phase_change
                             ! Calculate vapor and liquid volume fractions
                             a1 = (rho-rho2)/(rho1-rho2)
                             a2 = 1.d0 - a1
-                            DO i = 3, num_fluids
+                            DO i = 2, num_fluids-1
                                a2 = a2 - q_cons_vf(i+adv_idx%beg)%sf(j,k,l)
                             END DO
                             ! Cell update of the volume fraction
@@ -1010,27 +1003,24 @@ MODULE m_phase_change
             TstarB = TsatLv+factor
             CALL s_compute_fdfTsat(fA,dfdp,pressure,TstarA)
             CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
-            !PRINT *, 'fA :: ',fA,', fB :: ',fB
             DO WHILE ( fA*fB .GT. 0.d0 )
-                  IF (TstarA .GT. TsatHv) THEN
-                         PRINT *, 'Tsat bracketing failed to find lower bound'
-                         PRINT *, 'TstarA :: ',TstarA,', pressure :: ',pressure
-                         PRINT *, 'fA :: ',fA,', fB :: ',fB
-                         CALL s_mpi_abort()
-                  END IF
-                  fA = fB
-                  TstarA = TstarB
-                  TstarB = TstarA+factor
-                  CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
-                  !PRINT *, 'fB :: ',fB,', TstarB :: ',TstarB,', p :: ',pressure
-                  !PRINT *,'fB :: ',fB,', TstarB :: ',TstarB
-                  IF( ieee_is_nan(fB) ) THEN
-                        fB = fA
-                        TstarB = TstarA
-                        factor = factor-10.d0
-                  ELSE 
-                        factor = 20.d0
-                  END IF
+               IF( ieee_is_nan(fB) ) THEN
+                   fB = fA
+                   TstarB = TstarA
+                   factor = factor-10.d0
+               ELSE 
+                   factor = 20.d0
+               END IF
+               IF (TstarA .GT. TsatHv) THEN
+                    PRINT *, 'Tsat bracketing failed to find lower bound'
+                    PRINT *, 'TstarA :: ',TstarA,', pressure :: ',pressure
+                    PRINT *, 'fA :: ',fA,', fB :: ',fB
+                    CALL s_mpi_abort()
+               END IF
+               fA = fB
+               TstarA = TstarB
+               TstarB = TstarA+factor
+               CALL s_compute_fdfTsat(fB,dfdp,pressure,TstarB)
             END DO
         END SUBROUTINE s_compute_Tsat_bracket
 
@@ -1045,8 +1035,8 @@ MODULE m_phase_change
             !> @{
             REAL(KIND(0d0)), INTENT(IN)    :: pressure
             REAL(KIND(0d0))                :: f_Tsat, Tstar
-            REAL(KIND(0d0))                ::  delta, delta_old, fp, dfdp
-            REAL(KIND(0d0))                ::  fL, fH, TstarL, TstarH, TsatA, TsatB
+            REAL(KIND(0d0))                :: delta, delta_old, fp, dfdp
+            REAL(KIND(0d0))                :: fL, fH, TstarL, TstarH, TsatA, TsatB
             INTEGER :: iter                !< Generic loop iterators
             CALL s_compute_Tsat_bracket(TsatA,TsatB,pressure)
             ! Computing f at lower and higher end of the bracket
@@ -1171,7 +1161,6 @@ MODULE m_phase_change
                         factor = 1.05d0
                   END IF
             END DO
-
         END SUBROUTINE s_compute_ptg_bracket
 
         !>     The purpose of this subroutine is to determine the saturation
@@ -1247,7 +1236,6 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)                         :: fp, dfdp
             REAL(KIND(0d0)), INTENT(IN)                          :: pstar
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
-            !REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: gamma_min, pres_inf
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0))                                      :: numerator, denominator
             REAL(KIND(0d0))                                      :: drhodp
@@ -1284,19 +1272,19 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d-7
-            pstarB = 1.d1
+            pstarA = 1.d-6; pstarB = 1.d1;
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-            factor = 1.d1
             maxp = 1.d20; minp = -1.d20
             DO WHILE ( fA*fB .GT. 0.d0 )
-               IF ( pstarA .GT. maxp ) THEN
-                  pstarA = -1.d-7
-                  pstarB = -1.d1
+               IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.0d0 ) THEN
+                  pstarB = pstarA*bracket_factor*0.5d0
+                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+               ELSE IF ( pstarA .GT. maxp ) THEN
+                  pstarA = -1.d-6; pstarB = -1.d1;
                   CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. ieee_is_nan(fB) .OR. ieee_is_nan(fA)) THEN
+               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) ) THEN
                   PRINT *, 'P-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l,', pstarA :: ',pstarA
                   DO i = 1, num_fluids
@@ -1304,12 +1292,12 @@ MODULE m_phase_change
                      PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
                      PRINT *, 'p_K ',i,' :: ',pres_K_init(i)
                   END DO
-                  CALL s_mpi_abort()
+                  CALL s_mpi_abort()                
                ELSE 
                   fA = fB
                   pstarA = pstarB
-                  pstarB = pstarA*factor
-                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+                  pstarB = pstarA*bracket_factor
+                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)               
                END IF
             END DO
         END SUBROUTINE s_compute_pk_bracket
@@ -1393,25 +1381,17 @@ MODULE m_phase_change
             INTEGER                                              :: i
             Tdem = 0.d0; dTdp = 0.d0; fA = 0.d0; df = 0.d0;
             DO i = 1, num_fluids
-                  !Tdemk = (q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv &
-                  !     *((pres_inf(i)*(gamma_min(i)-1.d0))/(pstar+pres_inf(i)) + 1.d0))  
                   Tdemk = gamma_min(i)*q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) & 
                         *fluid_pp(i)%cv
                   fk = (q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv & 
                         *(gamma_min(i)-1.d0))/(pstar+pres_inf(i))
                   Tdem = Tdem + Tdemk
-                  !dTdp = dTdp + ((pres_inf(i)*(gamma_min(i)-1.d0)) &
-                  !       /(pstar+pres_inf(i))**2)/(Tdemk**2)
-                  !dTdp = dTdp + 1.d0/Tdemk
                   fA = fA + fk
                   df = df - fk/(pstar+pres_inf(i))
             END DO
-            !Tstar = rhoe/Tdem
             Tstar = (rhoe + pstar)/Tdem
             fp = 1.d0 - Tstar*fA
-            !dfdp = Tstar*df-rhoe*dTdp
             dfdp = -Tstar*df-fA/Tdem
-
         END SUBROUTINE s_compute_ptk_fdf !------------------------
 
         !>     The purpose of this subroutine is to determine the bracket of 
@@ -1429,19 +1409,19 @@ MODULE m_phase_change
             REAL(KIND(0d0))                :: factor, Tstar, maxp, minp
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d-9
-            pstarB = 1.d1
+            pstarA = 1.d-9; pstarB = 1.d1;
             CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-            factor = 1.d1
-            maxp = 1.d20; minp = -1.d20
+            maxp = 1.d20; minp = -1.d20;
             DO WHILE ( fA*fB .GT. 0.d0 )
-               IF ( pstarA .GT. maxp ) THEN
-                  pstarA = -1.d-9
-                  pstarB = -1.d1
+               IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.d0 ) THEN
+                  pstarB = pstarA*bracket_factor*0.5d0
+                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
+               ELSE IF ( pstarA .GT. maxp ) THEN
+                  pstarA = -1.d-9; pstarB = -1.d1;
                   CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
                   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. ieee_is_nan(fB) .OR. ieee_is_nan(fA)) THEN
+               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) ) THEN
                   PRINT *, 'PT-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l
                   PRINT *, 'rhoe :: ',rhoe
@@ -1453,39 +1433,10 @@ MODULE m_phase_change
                ELSE
                   fA = fB
                   pstarA = pstarB
-                  pstarB = pstarA*factor
+                  pstarB = pstarA*bracket_factor
                   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
                END IF
             END DO
-            !pstarA = 1.d-8
-            !pstarB = 1.d3
-            !CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
-            !CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-            !factor = 10.d0
-            !DO WHILE ( fA*fB .GT. 0.d0 )
-            !   IF (pstarA .GT. 1.d18) THEN
-            !      PRINT *, 'PT-k bracketing failed to find lower bound'
-            !      PRINT *, 'location j ',j,', k ',k,', l', l
-            !      PRINT *, 'pstarA :: ',pstarA,', pstarB :: ',pstarB
-            !      DO i = 1, num_fluids
-            !         PRINT *, 'alpha ',i,' :: ',q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)
-            !         PRINT *, 'rhoal ',i,' :: ',q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)
-            !         !PRINT *, 'p_K ',i,' :: ',pres_K_init(i)
-            !      END DO
-            !      CALL s_mpi_abort()
-            !  END IF
-            !  fA = fB
-            !  pstarA = pstarB
-            !  pstarB = pstarA*factor
-            !  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-            !  IF( ieee_is_nan(fB) ) THEN
-            !      fB = fA
-            !      pstarB = pstarA
-            !      factor = factor*0.5d0
-            !  ELSE 
-            !      factor = 10.d0
-            !  END IF
-            !END DO
         END SUBROUTINE s_compute_ptk_bracket
 
         !>     The purpose of this subroutine is to determine the saturation
@@ -1546,8 +1497,8 @@ MODULE m_phase_change
         END SUBROUTINE s_compute_pt_relax_k !-------------------------------
 
         SUBROUTINE s_finalize_relaxation_solver_module()
-           DEALLOCATE(gamma_min,pres_inf)
-           s_relaxation_solver => NULL()
+            DEALLOCATE(gamma_min,pres_inf)
+            s_relaxation_solver => NULL()
         END SUBROUTINE
 
 END MODULE m_phase_change
