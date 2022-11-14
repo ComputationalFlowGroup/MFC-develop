@@ -61,6 +61,10 @@ module load mpi/openmpi_4.1.1_gcc_10.2_slurm20
 module load gcc/10.2
 #> module load cuda/11.1.1
 #> module load nvhpc-sdk/2022
+#>module load mpi/openmpi_4.1.1_gcc_10.2_slurm20
+#>module load gcc/10.2
+#>module load cuda/11.1.1
+#>module load nvhpc-sdk/2022
 #>
 #> Note: The MFC prologue sets up the environment required
 #>       prior to execution.
@@ -80,9 +84,15 @@ module load gcc/10.2
 #> srun --mpi=pmix   \
 #>      "{MFC::BIN}"
 #>
-srun --mpi=pmix                    \
+#> srun --mpi=pmix                    \
+#>       -np {cpus_per_node*nodes} \
+#>        "{MFC::BIN}"
+
+mpirun -np $SLURM_NTASKS                    \
 #>       -np {cpus_per_node*nodes} \
         "{MFC::BIN}"
+
+
 #>
 
 {MFC::EPILOGUE}

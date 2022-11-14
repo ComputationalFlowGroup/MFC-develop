@@ -89,11 +89,11 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-10
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-12
     !< p_relaxk \alpha threshold,           set to 1E-15
     REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-8
     !< Saturation temperature tol,          set to 1E-10
-    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-8
+    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-9
     !< Saturation pTg tolerance,            set to 1.d-10
     REAL(KIND(0d0)), PARAMETER :: pres_critH        = 22.06d6   
     !< Critical water pressure              set to 22.06d6
@@ -106,6 +106,8 @@ MODULE m_phase_change
     REAL(KIND(0d0)), PARAMETER :: TsatLv            = 275.d0    
     !< factor for bracketing the solution,  set to 10
     REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 10.d0
+    !< maximum pressures allowed in the simulation
+    REAL(KIND(0d0)), PARAMETER :: maxp = 1.d15, minp = -1.d9
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -592,8 +594,8 @@ MODULE m_phase_change
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                     q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                             END DO
-                            CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         END IF
+                        CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                     END DO
                 END DO
             END DO
@@ -1246,9 +1248,9 @@ MODULE m_phase_change
                   numerator   = gamma_min(i)*(pstar+pres_inf(i))
                   denominator = numerator + pres_K_init(i)-pstar
                   rho_K_s(i)  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)/&
-                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps)*numerator/denominator
+                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*numerator/denominator
                   drhodp      = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / & 
-                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) * & 
+                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * & 
                      gamma_min(i)*(pres_K_init(i)+pres_inf(i)) / (denominator*denominator)
                   fp          = fp  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                   dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
@@ -1267,25 +1269,22 @@ MODULE m_phase_change
             TYPE(scalar_field), DIMENSION(sys_size), INTENT(IN)  :: q_cons_vf
             REAL(KIND(0d0)), INTENT(OUT)   :: pstarA, pstarB
             REAL(KIND(0d0))                :: fA, fB, dfdp
-            REAL(KIND(0d0))                :: factor, maxp, minp
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(IN)   :: pres_K_init
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d-6; pstarB = 1.d1;
+            pstarA = 1.d-9; pstarB = 1.d1;
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-            maxp = 1.d20; minp = -1.d20
             DO WHILE ( fA*fB .GT. 0.d0 )
                !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.0d0 ) THEN
                !   pstarB = pstarA*bracket_factor*0.5d0
                !   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                IF ( pstarA .GT. maxp ) THEN
-                  pstarA = -1.d-6; pstarB = -1.d1;
+                  pstarA = -1.d-9; pstarB = -1.d1;
                   CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. &
-                  ieee_is_nan(fB) ) THEN
+               ELSE IF ( (pstarA .LT. minp) .OR. ieee_is_nan(fB) ) THEN
                   PRINT *, 'P-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l,', pstarA :: ',pstarA
                   DO i = 1, num_fluids
@@ -1407,13 +1406,12 @@ MODULE m_phase_change
             REAL(KIND(0d0)), INTENT(OUT)   :: pstarA, pstarB
             REAL(KIND(0d0)), INTENT(IN)    :: rhoe
             REAL(KIND(0d0))                :: fA, fB, dfdp
-            REAL(KIND(0d0))                :: factor, Tstar, maxp, minp
+            REAL(KIND(0d0))                :: factor, Tstar
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
             pstarA = 1.d-9; pstarB = 1.d1;
             CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-            maxp = 1.d20; minp = -1.d20;
             DO WHILE ( fA*fB .GT. 0.d0 )
                !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.d0 ) THEN
                !   pstarB = pstarA*bracket_factor*0.5d0
@@ -1422,8 +1420,7 @@ MODULE m_phase_change
                   pstarA = -1.d-9; pstarB = -1.d1;
                   CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
                   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .AND. (pstarA .LT. 0.d0) .OR. &
-                  ieee_is_nan(fB) ) THEN
+               ELSE IF ( (pstarA .LT. minp) .OR. ieee_is_nan(fB) ) THEN
                   PRINT *, 'PT-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l
                   PRINT *, 'rhoe :: ',rhoe
