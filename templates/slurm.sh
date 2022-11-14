@@ -33,6 +33,7 @@
 #>SBATCH --constraint=cascade
 #SBATCH --time={walltime}
 #SBATCH --partition="{partition}"
+#SBATCH --mem=100G
 #SBATCH --output="{name}.out"
 #SBATCH --account="{account}"
 #SBATCH --error="{name}.err"
@@ -58,8 +59,8 @@
 
 module load mpi/openmpi_4.1.1_gcc_10.2_slurm20
 module load gcc/10.2
-module load cuda/11.1.1
-module load nvhpc-sdk/2022
+#> module load cuda/11.1.1
+#> module load nvhpc-sdk/2022
 #>
 #> Note: The MFC prologue sets up the environment required
 #>       prior to execution.

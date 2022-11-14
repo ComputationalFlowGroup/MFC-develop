@@ -88,7 +88,7 @@ PROGRAM p_main
         CALL s_read_input_file()
         CALL s_check_input_file()
     END IF
-    !IF (proc_rank==0) print*, 'Read input file'
+    ! IF (proc_rank==0) print*, 'Read input file'
    
     ! Broadcasting the user inputs to all of the processors and performing the
     ! parallel computational domain decomposition. Neither procedure has to be
@@ -96,7 +96,7 @@ PROGRAM p_main
     CALL s_mpi_bcast_user_inputs()
     CALL s_initialize_parallel_io()
     CALL s_mpi_decompose_computational_domain()
-    !IF (proc_rank==0) print*, 'Broadcast'
+    ! IF (proc_rank==0) print*, 'Broadcast'
     
     ! Computation of parameters, allocation of memory, association of pointers,
     ! and/or the execution of any other tasks needed to properly configure the
@@ -114,7 +114,7 @@ PROGRAM p_main
     IF (qbmm) CALL s_initialize_qbmm_module()
     CALL s_initialize_phasechange_module()
 
-    !IF (proc_rank==0) print*, 'Initialize'
+    ! IF (proc_rank==0) print*, 'Initialize'
     
     ! Associate pointers for serial or parallel I/O
     IF (parallel_io .NEQV. .TRUE.) THEN
@@ -153,6 +153,8 @@ PROGRAM p_main
     END IF
     finaltime = t_step_stop*dt
     dt0 = dt
+
+    IF (proc_rank==0) print*, 'Time-stepping'
 
     ! Time-stepping Loop =======================================================
     DO
@@ -202,7 +204,9 @@ PROGRAM p_main
         ! print*, 'Write data files'
         ! Backing up the grid and conservative variables data
         IF(MOD(t_step-t_step_start, t_step_save) == 0) THEN
+            ! IF(proc_rank==0) PRINT *, 'writing data'
             CALL s_write_data_files(q_cons_ts(1)%vf, t_step)
+            ! IF(proc_rank==0) PRINT *, 'finished writing data!'
         END IF
 
         CALL system_clock(cpu_end)
