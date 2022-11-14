@@ -377,7 +377,6 @@ MODULE m_time_steppers
             END DO
             
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
-            PRINT *, 'relax 1'
             IF (model_eqns == 3)    CALL s_relaxation_solver(q_cons_ts(2)%vf)
 
             ! ==================================================================
@@ -402,7 +401,6 @@ MODULE m_time_steppers
             END DO
             
             IF (grid_geometry == 3) CALL s_apply_fourier_filter(q_cons_ts(2)%vf)
-            PRINT *, 'relax 1'
             IF (model_eqns == 3)    CALL s_relaxation_solver(q_cons_ts(2)%vf)
 
             ! ==================================================================
