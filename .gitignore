@@ -4,6 +4,8 @@ src/*/tags
 
 __pycache__
 
+*.err
+*.out
 src/*/*.mod
 src/*/*.o
 src/pre_process_code/pre_process
