@@ -89,11 +89,11 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-12
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-13
     !< p_relaxk \alpha threshold,           set to 1E-15
     REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-8
     !< Saturation temperature tol,          set to 1E-10
-    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-9
+    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-10
     !< Saturation pTg tolerance,            set to 1.d-10
     REAL(KIND(0d0)), PARAMETER :: pres_critH        = 22.06d6   
     !< Critical water pressure              set to 22.06d6
