@@ -620,7 +620,7 @@ MODULE m_variables_conversion
                             ! p = ( E/(1-alf) - 0.5 rho u u/(1-alf) - pi_inf_k )/gamma_k
                             qK_prim_vf(E_idx)%sf(j,k,l) = &
                                 ( (qK_cons_vf(E_idx)%sf(j,k,l) &
-                                                - dyn_pres_K) / (1.d0 - qK_cons_vf(alf_idx)%sf(j,k,l)) &
+                                                - dyn_pres_K) / (qK_cons_vf(alf_idx)%sf(j,k,l)) &
                                                 - pi_inf_K &
                                                 - E_We_K ) / gamma_K
                         ELSE

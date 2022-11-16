@@ -626,9 +626,9 @@ MODULE m_phase_change
                 DO k = 0, n
                     DO l = 0, p
                         ! Numerical correction of the volume fractions
-                        !IF (mpp_lim) THEN
-                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        !END IF
+                        IF (mpp_lim) THEN
+                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        END IF
                         ! P RELAXATION==============================================
                         relax = .TRUE.
                         DO i = 1, num_fluids
@@ -642,6 +642,7 @@ MODULE m_phase_change
                                 - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
                                 / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                 - fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                               IF (pres_K_init(i) .LE. 0.d0) pres_K_init(i) = 1E-2
                            END DO
                            CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                            ! Cell update of the volume fraction
@@ -654,9 +655,9 @@ MODULE m_phase_change
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! PT RELAXATION==============================================
-                        !IF (mpp_lim) THEN
-                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        !END IF
+                        IF (mpp_lim) THEN
+                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        END IF
                         relax = .FALSE.
                         rhoe = 0.d0
                         DO i = 1, num_fluids
