@@ -89,7 +89,7 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-13
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-15
     !< p_relaxk \alpha threshold,           set to 1E-15
     REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-10
     !< Saturation temperature tol,          set to 1E-10
@@ -97,15 +97,15 @@ MODULE m_phase_change
     !< Saturation pTg tolerance,            set to 1.d-10
     REAL(KIND(0d0)), PARAMETER :: pres_critH        = 22.06d6   
     !< Critical water pressure              set to 22.06d6
-    REAL(KIND(0d0)), PARAMETER :: pres_critL        = 1.d3
+    REAL(KIND(0d0)), PARAMETER :: pres_critL        = 1.d4
     !< Critical water pressure              set to 1.d3
     REAL(KIND(0d0)), PARAMETER :: T_crit            = 648.d0    
     !< Critical water temperature           set to 648
     REAL(KIND(0d0)), PARAMETER :: TsatHv            = 900.d0   
     !< Saturation temperature threshold,    set to 900
-    REAL(KIND(0d0)), PARAMETER :: TsatLv            = 100.d0    
+    REAL(KIND(0d0)), PARAMETER :: TsatLv            = 275.d0    
     !< factor for bracketing the solution,  set to 10
-    REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 10.d0
+    REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 5.d0
     !< maximum pressures allowed in the simulation
     REAL(KIND(0d0)), PARAMETER :: maxp = 1.d18, minp = -1.d9
     !> @}
@@ -626,9 +626,9 @@ MODULE m_phase_change
                 DO k = 0, n
                     DO l = 0, p
                         ! Numerical correction of the volume fractions
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         ! P RELAXATION==============================================
                         relax = .TRUE.
                         DO i = 1, num_fluids
@@ -654,9 +654,9 @@ MODULE m_phase_change
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! PT RELAXATION==============================================
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         relax = .FALSE.
                         rhoe = 0.d0
                         DO i = 1, num_fluids
@@ -713,9 +713,9 @@ MODULE m_phase_change
                 DO k = 0, n
                     DO l = 0, p
                         ! Numerical correction of the volume fractions
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         ! P RELAXATION==============================================
                         relax = .TRUE.
                         DO i = 1, num_fluids
@@ -768,9 +768,9 @@ MODULE m_phase_change
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! CHECKING IF PTG RELAXATION IS NEEDED  =====================
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         rhoe = 0.d0; Bsum = 0.d0; rcv  = 0.d0; dyn_pres = 0.d0
                         relax = .FALSE.
                         !IF (mpp_lim) THEN
@@ -1253,9 +1253,9 @@ MODULE m_phase_change
                   numerator   = gamma_min(i)*(pstar+pres_inf(i))
                   denominator = numerator + pres_K_init(i)-pstar
                   rho_K_s(i)  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)/&
-                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*numerator/denominator
+                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps)*numerator/denominator
                   drhodp      = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / & 
-                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * & 
+                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) * & 
                      gamma_min(i)*(pres_K_init(i)+pres_inf(i)) / (denominator*denominator)
                   fp          = fp  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                   dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
@@ -1278,7 +1278,7 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d1; pstarB = 1.d5;
+            pstarA = 1.d-2; pstarB = 1.d5;
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             DO WHILE ( fA*fB .GT. 0.d0 )
