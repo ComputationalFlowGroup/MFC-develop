@@ -585,6 +585,8 @@ MODULE m_phase_change
                                 - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
                                 / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                 - fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                            !IF (pres_K_init(i) .LT. 0.d0 .AND. DABS(pres_K_init(i)) .LT. pres_inf(i)) &
+                            !    pres_K_init(i) = sgm_eps
                             END DO
                             CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
@@ -1286,11 +1288,11 @@ MODULE m_phase_change
                !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.0d0 ) THEN
                !   pstarB = pstarA*bracket_factor*0.5d0
                !   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               !IF ( pstarA .GT. maxp ) THEN
-               !   pstarA = -1.d1; pstarB = -1.d5;
-               !   CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               !   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
-               IF ( (pstarA .GT. maxp) .OR. ieee_is_nan(fB) ) THEN
+               IF ( pstarA .GT. maxp ) THEN
+                  pstarA = -1.d1; pstarB = -1.d5;
+                  CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+                  CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
+               ELSE IF ( (pstarA .LT. minp) .OR. ieee_is_nan(fB) ) THEN
                   PRINT *, 'P-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l,', pstarA :: ',pstarA
                   DO i = 1, num_fluids
