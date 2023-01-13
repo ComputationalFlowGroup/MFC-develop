@@ -1604,8 +1604,6 @@ contains
         SUBROUTINE s_check_supported_patch_smoothing(patch_id) ! ---------------
             
             INTEGER, INTENT(IN) :: patch_id
-            
-            
             ! Constraints on the smoothing parameters of a supported patch
             IF( (              patch_icpp(patch_id)%smoothen              &
                                            .AND.                          &
@@ -1621,9 +1619,17 @@ contains
                                            .OR.                           &
                     patch_icpp(patch_id)%smooth_coeff /= dflt_real ) ) ) THEN
                 
-                PRINT '(A,I0,A)', 'Inconsistency(ies) detected in '         // &
+                PRINT '(A,I0,A)', 'A: Inconsistency(ies) detected in '         // &
                                   'smoothing parameters of supported '      // &
                                   'patch ',patch_id,'. Exiting ...'
+
+            IF (proc_rank==0) THEN
+                PRINT *, 'patch_id :: ',patch_id
+                PRINT *, 'smooth :: ', patch_icpp(patch_id)%smoothen
+                PRINT *, 'id :: ',patch_icpp(patch_id)%smooth_patch_id
+                PRINT *, 'smooth coeff :: ',patch_icpp(patch_id)%smooth_coeff
+            END IF
+
                 CALL s_mpi_abort()
                 
             END IF
@@ -1651,7 +1657,7 @@ contains
                                            .OR.                           &
                     patch_icpp(patch_id)%smooth_coeff /= dflt_real     ) THEN
                 
-                PRINT '(A,I0,A)', 'Inconsistency(ies) detected in '         // &
+                PRINT '(A,I0,A)', 'B: Inconsistency(ies) detected in '         // &
                                   'smoothing parameters of unsupported '    // &
                                   'patch ',patch_id,'. Exiting ...'
                 CALL s_mpi_abort()

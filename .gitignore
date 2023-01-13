@@ -72,3 +72,5 @@ tests_hypoelastic/*/silo*
 tests_hypoelastic/*/restart*
 tests_hypoelastic/*/*.out
 tests_hypoelastic/*/binary
+
+sim.sh
