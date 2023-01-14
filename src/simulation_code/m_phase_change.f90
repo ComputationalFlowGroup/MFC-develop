@@ -89,15 +89,15 @@ MODULE m_phase_change
     !> @{
     INTEGER,         PARAMETER :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-12
+    REAL(KIND(0d0)), PARAMETER :: pknewton_eps      = 1.d-15
     !< p_relaxk \alpha threshold,           set to 1E-15
-    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-8
+    REAL(KIND(0d0)), PARAMETER :: pTsatnewton_eps   = 1.d-10
     !< Saturation temperature tol,          set to 1E-10
-    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-9
+    REAL(KIND(0d0)), PARAMETER :: ptgnewton_eps     = 1.d-8
     !< Saturation pTg tolerance,            set to 1.d-10
     REAL(KIND(0d0)), PARAMETER :: pres_critH        = 22.06d6   
     !< Critical water pressure              set to 22.06d6
-    REAL(KIND(0d0)), PARAMETER :: pres_critL        = 1.d3
+    REAL(KIND(0d0)), PARAMETER :: pres_critL        = 1.d4
     !< Critical water pressure              set to 1.d3
     REAL(KIND(0d0)), PARAMETER :: T_crit            = 648.d0    
     !< Critical water temperature           set to 648
@@ -105,9 +105,9 @@ MODULE m_phase_change
     !< Saturation temperature threshold,    set to 900
     REAL(KIND(0d0)), PARAMETER :: TsatLv            = 275.d0    
     !< factor for bracketing the solution,  set to 10
-    REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 10.d0
+    REAL(KIND(0d0)), PARAMETER :: bracket_factor    = 5.d0
     !< maximum pressures allowed in the simulation
-    REAL(KIND(0d0)), PARAMETER :: maxp = 1.d15, minp = -1.d9
+    REAL(KIND(0d0)), PARAMETER :: maxp = 1.d18, minp = -1.d9
     !> @}
 
     !> @name Gibbs free energy phase change parameters
@@ -585,6 +585,8 @@ MODULE m_phase_change
                                 - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
                                 / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                 - fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                            !IF (pres_K_init(i) .LT. 0.d0 .AND. DABS(pres_K_init(i)) .LT. pres_inf(i)) &
+                            !    pres_K_init(i) = sgm_eps
                             END DO
                             CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
@@ -642,6 +644,7 @@ MODULE m_phase_change
                                 - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv) &
                                 / q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) &
                                 - fluid_pp(i)%pi_inf)/fluid_pp(i)%gamma
+                               IF (pres_K_init(i) .LE. 0.d0) pres_K_init(i) = 1E-2
                            END DO
                            CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                            ! Cell update of the volume fraction
@@ -713,14 +716,15 @@ MODULE m_phase_change
                 DO k = 0, n
                     DO l = 0, p
                         ! Numerical correction of the volume fractions
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         ! P RELAXATION==============================================
-                        relax = .FALSE.
+                        relax = .TRUE.
                         DO i = 1, num_fluids
-                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
-                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
+                            IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. (1.d0-palpha_eps)) relax = .FALSE.
+                            !IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
+                            !    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
                         END DO
                         IF (relax) THEN
                             DO i = 1, num_fluids
@@ -734,22 +738,24 @@ MODULE m_phase_change
                             CALL s_compute_p_relax_k(rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                             ! Cell update of the volume fraction
                             DO i = 1, num_fluids
-                              IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
-                                  (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) &
+                              IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps) &
+                              !IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
+                              !    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) &
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
                                     q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                             END DO
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! PT RELAXATION==============================================
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         rhoeq = 0.d0
-                        relax = .FALSE.
+                        relax = .TRUE.
                         DO i = 1, num_fluids
-                            IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
-                                (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
+                            IF (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. (1.d0-palpha_eps)) relax = .FALSE.
+                            !IF ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .LT. 1.d0-palpha_eps) .AND. & 
+                            !    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .GT. palpha_eps)) relax = .TRUE.
                         END DO
                         IF (relax) THEN
                             DO i = 1, num_fluids
@@ -765,33 +771,35 @@ MODULE m_phase_change
                         END IF
                         CALL s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! CHECKING IF PTG RELAXATION IS NEEDED  =====================
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         rhoe = 0.d0; Bsum = 0.d0; rcv  = 0.d0; dyn_pres = 0.d0
                         relax = .FALSE.
-                        IF (mpp_lim) THEN
-                            CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        END IF
+                        !IF (mpp_lim) THEN
+                        !    CALL s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !END IF
                         IF ((q_cons_vf(adv_idx%beg)%sf(j,k,l) .GT. ptgalpha_eps) .AND. &
-                            (q_cons_vf(adv_idx%beg)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) .AND. & 
-                            (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .GT. ptgalpha_eps) .AND. & 
-                            (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) ) relax = .TRUE.
+                            (q_cons_vf(adv_idx%beg)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps)) relax = .TRUE.
+                        !IF ((q_cons_vf(adv_idx%beg)%sf(j,k,l) .GT. ptgalpha_eps) .AND. &
+                        !    (q_cons_vf(adv_idx%beg)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) .AND. & 
+                        !    (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .GT. ptgalpha_eps) .AND. & 
+                        !    (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .LT. 1.d0-ptgalpha_eps) ) relax = .TRUE.
                         IF (relax) THEN
-                           CALL s_convert_to_mixture_variables( q_cons_vf, rho, &
-                                                                gamma, pi_inf,  &
-                                                                Re, We, j, k, l )
+                           !CALL s_convert_to_mixture_variables( q_cons_vf, rho, &
+                           !                                     gamma, pi_inf,  &
+                           !                                     Re, We, j, k, l )
                            DO i = 1, num_fluids
                                rhoe = rhoe + q_cons_vf(i+internalEnergies_idx%beg-1)%sf(j,k,l) 
                                Bsum = Bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
                                rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
                            END DO                   
-                           DO i = mom_idx%beg, mom_idx%end
-                              dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * & 
-                              q_cons_vf(i)%sf(j,k,l) / MAX(rho,sgm_eps)
-                           END DO
-                           pres_relax = (q_cons_vf(E_idx)%sf(j,k,l) - dyn_pres - pi_inf)/gamma
-                           !pres_relax = (rhoe - pi_inf)/gamma
+                           !DO i = mom_idx%beg, mom_idx%end
+                           !   dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * & 
+                           !   q_cons_vf(i)%sf(j,k,l) / MAX(rho,sgm_eps)
+                           !END DO
+                           !pres_relax = (q_cons_vf(E_idx)%sf(j,k,l) - dyn_pres - pi_inf)/gamma
+                           pres_relax = (rhoe - pi_inf)/gamma
                            Tmix = gamma*(pres_relax+Bsum)/rcv
                            IF(pres_relax .LT. pres_critH .AND. pres_relax .GT. pres_critL .AND. Tmix .LT. T_crit) THEN
                              Tsat = f_Tsat(pres_relax)
@@ -819,10 +827,10 @@ MODULE m_phase_change
                                    (fluid_pp(2)%cv*Trelax)
                             ! Calculate vapor and liquid volume fractions
                             a1 = (rho-rho2)/(rho1-rho2)
-                            a2 = 1.d0 - a1
-                            DO i = 2, num_fluids-1
-                               a2 = a2 - q_cons_vf(i+adv_idx%beg)%sf(j,k,l)
-                            END DO
+                            a2 = 1.d0 - a1 - q_cons_vf(2+adv_idx%beg)%sf(j,k,l)
+                            !DO i = 2, num_fluids-1
+                            !   a2 = a2 - q_cons_vf(i+adv_idx%beg)%sf(j,k,l)
+                            !END DO
                             ! Cell update of the volume fraction
                             q_cons_vf(cont_idx%beg)%sf(j,k,l)   = rho1*a1
                             q_cons_vf(1+cont_idx%beg)%sf(j,k,l) = rho2*a2
@@ -1248,9 +1256,9 @@ MODULE m_phase_change
                   numerator   = gamma_min(i)*(pstar+pres_inf(i))
                   denominator = numerator + pres_K_init(i)-pstar
                   rho_K_s(i)  = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)/&
-                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*numerator/denominator
+                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps)*numerator/denominator
                   drhodp      = q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / & 
-                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) * & 
+                     MAX(q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l),sgm_eps) * & 
                      gamma_min(i)*(pres_K_init(i)+pres_inf(i)) / (denominator*denominator)
                   fp          = fp  + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_K_s(i)
                   dfdp        = dfdp - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) * & 
@@ -1273,7 +1281,7 @@ MODULE m_phase_change
             REAL(KIND(0d0)), DIMENSION(num_fluids), INTENT(OUT)  :: rho_K_s
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d-9; pstarB = 1.d1;
+            pstarA = 1.d-2; pstarB = 1.d5;
             CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
             DO WHILE ( fA*fB .GT. 0.d0 )
@@ -1281,7 +1289,7 @@ MODULE m_phase_change
                !   pstarB = pstarA*bracket_factor*0.5d0
                !   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                IF ( pstarA .GT. maxp ) THEN
-                  pstarA = -1.d-9; pstarB = -1.d1;
+                  pstarA = -1.d1; pstarB = -1.d5;
                   CALL s_compute_pk_fdf(fA,dfdp,pstarA,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                   CALL s_compute_pk_fdf(fB,dfdp,pstarB,rho_K_s,pres_K_init,q_cons_vf,j,k,l)
                ELSE IF ( (pstarA .LT. minp) .OR. ieee_is_nan(fB) ) THEN
@@ -1409,18 +1417,18 @@ MODULE m_phase_change
             REAL(KIND(0d0))                :: factor, Tstar
             INTEGER, INTENT(IN)            :: j, k, l
             INTEGER                        :: i
-            pstarA = 1.d-9; pstarB = 1.d1;
+            pstarA = 1.d1; pstarB = 1.d5;
             CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
             CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
             DO WHILE ( fA*fB .GT. 0.d0 )
                !IF ( ieee_is_nan(fB) .OR. ieee_is_nan(fA) .OR. DABS(fB) .GT. 20.d0 ) THEN
                !   pstarB = pstarA*bracket_factor*0.5d0
                !   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               IF ( pstarA .GT. maxp ) THEN
-                  pstarA = -1.d-9; pstarB = -1.d1;
-                  CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
-                  CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
-               ELSE IF ( (pstarA .LT. minp) .OR. ieee_is_nan(fB) ) THEN
+               !IF ( pstarA .GT. maxp ) THEN
+               !   pstarA = -1.d1; pstarB = -1.d5;
+               !   CALL s_compute_ptk_fdf(fA,dfdp,pstarA,Tstar,rhoe,q_cons_vf,j,k,l)
+               !   CALL s_compute_ptk_fdf(fB,dfdp,pstarB,Tstar,rhoe,q_cons_vf,j,k,l)
+               IF ( (pstarA .GT. maxp) .OR. ieee_is_nan(fB) ) THEN
                   PRINT *, 'PT-K bracketing failed to find lower bound'
                   PRINT *, 'location j ',j,', k ',k,', l', l
                   PRINT *, 'rhoe :: ',rhoe
