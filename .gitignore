@@ -74,3 +74,6 @@ tests_hypoelastic/*/*.out
 tests_hypoelastic/*/binary
 
 sim.sh
+*.dat
+*.inp
+*.inf
