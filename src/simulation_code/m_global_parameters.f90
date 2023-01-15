@@ -98,8 +98,8 @@ MODULE m_global_parameters
     INTEGER         :: weno_order     !< Order of the WENO reconstruction
     INTEGER         :: weno_polyn     !< Degree of the WENO polynomials (polyn)
     REAL(KIND(0d0)) :: weno_eps       !< Binding for the WENO nonlinear weights
-	REAL(KIND(0d0)) :: palpha_eps     !< trigger parameter for the  p  relaxation procedure, phase change model
-	REAL(KIND(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
+    REAL(KIND(0d0)) :: palpha_eps     !< trigger parameter for the  p  relaxation procedure, phase change model
+    REAL(KIND(0d0)) :: ptgalpha_eps   !< trigger parameter for the pTg relaxation procedure, phase change model
     LOGICAL         :: char_decomp    !< Characteristic decomposition
     LOGICAL         :: mapped_weno    !< WENO with mapping of nonlinear weights
     LOGICAL         :: mp_weno        !< Monotonicity preserving (MP) WENO
