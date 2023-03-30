@@ -750,7 +750,7 @@ module m_phase_change
                         !if (mpp_lim) then
                         !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         !end if
-                        rhoeq = 0.d0
+                        rhoeq = 0.d0; bsum = 0.d0; rcv  = 0.d0; dyn_pres = 0.d0
                         relax = .true.
                         do i = 1, num_fluids
                             if (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. (1.d0-palpha_eps)) relax = .false.
@@ -758,10 +758,24 @@ module m_phase_change
                             !    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. palpha_eps)) relax = .true.
                         end do
                         if (relax) then
+                            call s_convert_to_mixture_variables( q_cons_vf, rho, &
+                                                             gamma, pi_inf,  &
+                                                             re, we, j, k, l )
+
                             do i = 1, num_fluids
                                rhoeq = rhoeq + q_cons_vf(i+internalenergies_idx%beg-1)%sf(j,k,l) &
                                            - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
+                               bsum = bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
+                               rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
                             end do                   
+
+                            dyn_pres = 0.d0
+                            do i = mom_idx%beg, mom_idx%end
+                                 dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * & 
+                                 q_cons_vf(i)%sf(j,k,l) / max(rho,sgm_eps)
+                            end do
+                            pres_relax = (q_cons_vf(e_idx)%sf(j,k,l) - dyn_pres - pi_inf)/gamma
+                            trelax = gamma*(pres_relax+bsum)/rcv
                             call s_compute_pt_relax_k(pres_relax,trelax,rhoeq,q_cons_vf,j,k,l)
                             do i = 1, num_fluids
                                 q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
@@ -769,7 +783,7 @@ module m_phase_change
                                 *fluid_pp(i)%cv*trelax/(pres_relax+pres_inf(i))
                             end do
                         end if
-                        !call s_mixture_total_energy_correction(q_cons_vf, j, k, l )
+                        call s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! checking if ptg relaxation is needed  =====================
                         !if (mpp_lim) then
                         !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
@@ -786,9 +800,9 @@ module m_phase_change
                         !    (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .gt. ptgalpha_eps) .and. & 
                         !    (q_cons_vf(adv_idx%beg+1)%sf(j,k,l) .lt. 1.d0-ptgalpha_eps) ) relax = .true.
                         if (relax) then
-                           !call s_convert_to_mixture_variables( q_cons_vf, rho, &
-                           !                                     gamma, pi_inf,  &
-                           !                                     re, we, j, k, l )
+                           call s_convert_to_mixture_variables( q_cons_vf, rho, &
+                                                                gamma, pi_inf,  &
+                                                                re, we, j, k, l )
                            do i = 1, num_fluids
                                rhoe = rhoe + q_cons_vf(i+internalenergies_idx%beg-1)%sf(j,k,l) 
                                bsum = bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
@@ -1190,7 +1204,8 @@ module m_phase_change
             real(kind(0d0))                ::  fl, fh, pstarl, pstarh
             integer :: iter                !< generic loop iterators
             ! computing the bracket of the root solution
-            call s_compute_ptg_bracket(pstara,pstarb,pstar,rho0,e0)
+            !call s_compute_ptg_bracket(pstara,pstarb,pstar,rho0,e0)
+            pstara = 0.1d0*pstar; pstarb = 10.d0*pstar
             ! computing f at lower and higher end of the bracket
             call s_compute_ptg_fdf(fl,dfdp,pstara,dtstar,rho0,e0)
             call s_compute_ptg_fdf(fh,dfdp,pstarb,dtstar,rho0,e0)
@@ -1456,7 +1471,8 @@ module m_phase_change
             !!       iteration procedure, a-d, and iteration variables, f and df
             !> @{
             type(scalar_field), dimension(sys_size), intent(in)  :: q_cons_vf
-            real(kind(0d0)), intent(out)                         :: pstar, tstar
+            real(kind(0d0)), intent(inout)                       :: pstar
+            real(kind(0d0)), intent(out)                         :: tstar
             real(kind(0d0)), intent(in)                          :: rhoe
             real(kind(0d0))                                      :: pstara, pstarb
             real(kind(0d0))                                      :: delta, delta_old, fp, dfdp
@@ -1464,7 +1480,8 @@ module m_phase_change
             integer, intent(in)                                  :: j, k, l
             integer :: iter                !< generic loop iterators
             ! computing the bracket of the root solution
-            call s_compute_ptk_bracket(pstara,pstarb,rhoe,q_cons_vf,j,k,l)
+            !call s_compute_ptk_bracket(pstara,pstarb,rhoe,q_cons_vf,j,k,l)
+            pstara = 0.1d0*pstar; pstarb = 10.d0*pstar
             ! computing f at lower and higher end of the bracket
             call s_compute_ptk_fdf(fl,dfdp,pstara,tstar,rhoe,q_cons_vf,j,k,l)
             call s_compute_ptk_fdf(fh,dfdp,pstarb,tstar,rhoe,q_cons_vf,j,k,l)
