@@ -628,9 +628,9 @@ module m_phase_change
                 do k = 0, n
                     do l = 0, p
                         ! numerical correction of the volume fractions
-                        if (mpp_lim) then
-                            call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        end if
+                        !if (mpp_lim) then
+                        !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !end if
                         ! p relaxation==============================================
                         relax = .true.
                         do i = 1, num_fluids
@@ -655,11 +655,11 @@ module m_phase_change
                                  q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l) / rho_k_s(i)
                            end do
                         end if
-                        call s_mixture_total_energy_correction(q_cons_vf, j, k, l )
+                        !call s_mixture_total_energy_correction(q_cons_vf, j, k, l )
                         ! pt relaxation==============================================
-                        if (mpp_lim) then
-                            call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        end if
+                        !if (mpp_lim) then
+                        !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
+                        !end if
                         relax = .false.
                         rhoe = 0.d0
                         do i = 1, num_fluids
@@ -840,6 +840,7 @@ module m_phase_change
                             ! calculate vapor and liquid volume fractions
                             a1 = (rho-rho2)/(rho1-rho2)
                             !a2 = 1.d0 - a1 - q_cons_vf(2+adv_idx%beg)%sf(j,k,l)
+                            a2 = 1.d0 - a1
                             do i = 2, num_fluids-1
                                a2 = a2 - q_cons_vf(i+adv_idx%beg)%sf(j,k,l)
                             end do
