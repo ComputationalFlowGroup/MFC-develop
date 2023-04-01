@@ -89,11 +89,11 @@ module m_phase_change
     !> @{
     integer,         parameter :: newton_iter       = 50        
     !< p_relaxk \alpha iter,                set to 25
-    real(kind(0d0)), parameter :: pknewton_eps      = 1.d-16
+    real(kind(0d0)), parameter :: pknewton_eps      = 1.d-15
     !< p_relaxk \alpha threshold,           set to 1e-15
-    real(kind(0d0)), parameter :: ptsatnewton_eps   = 1.d-12
+    real(kind(0d0)), parameter :: ptsatnewton_eps   = 1.d-10
     !< saturation temperature tol,          set to 1e-10
-    real(kind(0d0)), parameter :: ptgnewton_eps     = 1.d-10
+    real(kind(0d0)), parameter :: ptgnewton_eps     = 1.d-8
     !< saturation ptg tolerance,            set to 1.d-10
     real(kind(0d0)), parameter :: pres_crith        = 22.06d6   
     !< critical water pressure              set to 22.06d6
@@ -738,7 +738,7 @@ module m_phase_change
                             call s_compute_p_relax_k(rho_k_s,pres_k_init,q_cons_vf,j,k,l)
                             ! cell update of the volume fraction
                             do i = 1, num_fluids
-                              if (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. palpha_eps) &
+                              !if (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. palpha_eps) &
                               !if ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .lt. 1.d0-palpha_eps) .and. & 
                               !    (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. palpha_eps)) &
                                     q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) = & 
@@ -751,6 +751,7 @@ module m_phase_change
                         !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         !end if
                         relax = .true.
+                        rhoeq = 0.d0; bsum = 0.d0; rcv  = 0.d0; dyn_pres = 0.d0
                         do i = 1, num_fluids
                             if (q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .gt. (1.d0-palpha_eps)) relax = .false.
                             !if ((q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l) .lt. 1.d0-palpha_eps) .and. & 
@@ -760,14 +761,12 @@ module m_phase_change
                             call s_convert_to_mixture_variables( q_cons_vf, rho, &
                                                              gamma, pi_inf,  &
                                                              re, we, j, k, l )
-                            rhoeq = 0.d0; bsum = 0.d0; rcv  = 0.d0; 
                             do i = 1, num_fluids
                                rhoeq = rhoeq + q_cons_vf(i+internalenergies_idx%beg-1)%sf(j,k,l) &
                                            - q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%qv
                                bsum = bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
                                rcv = rcv + q_cons_vf(i+cont_idx%beg-1)%sf(j,k,l)*fluid_pp(i)%cv
                             end do                   
-                            dyn_pres = 0.d0
                             do i = mom_idx%beg, mom_idx%end
                                  dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j,k,l) * & 
                                  q_cons_vf(i)%sf(j,k,l) / max(rho,sgm_eps)
@@ -786,10 +785,8 @@ module m_phase_change
                         !if (mpp_lim) then
                         !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
                         !end if
+                        rhoe = 0.d0; bsum = 0.d0; rcv  = 0.d0; dyn_pres = 0.d0
                         relax = .false.
-                        !if (mpp_lim) then
-                        !    call s_mixture_volume_fraction_correction(q_cons_vf, j, k, l )
-                        !end if
                         if ((q_cons_vf(adv_idx%beg)%sf(j,k,l) .gt. ptgalpha_eps) .and. &
                             (q_cons_vf(adv_idx%beg)%sf(j,k,l) .lt. 1.d0-ptgalpha_eps)) relax = .true.
                         !if ((q_cons_vf(adv_idx%beg)%sf(j,k,l) .gt. ptgalpha_eps) .and. &
@@ -800,7 +797,6 @@ module m_phase_change
                            call s_convert_to_mixture_variables( q_cons_vf, rho, &
                                                                 gamma, pi_inf,  &
                                                                 re, we, j, k, l )
-                           rhoe = 0.d0
                            do i = 1, num_fluids
                                rhoe = rhoe + q_cons_vf(i+internalenergies_idx%beg-1)%sf(j,k,l) 
                                !bsum = bsum + q_cons_vf(i+adv_idx%beg-1)%sf(j,k,l)*pres_inf(i)
